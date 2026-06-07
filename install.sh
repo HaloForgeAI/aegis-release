@@ -88,7 +88,7 @@ verify_checksum() {
 ensure_public_image_available() {
   local image_scope token_response
   image_scope="repository:haloforgeai/aegis:pull"
-  token_response="$(curl -fsSL "https://ghcr.io/token?service=ghcr.io&scope=${image_scope}" || true)"
+  token_response="$(curl -fsSL "https://ghcr.io/token?service=ghcr.io&scope=${image_scope}" 2>/dev/null || true)"
   if ! printf '%s' "$token_response" | grep -q '"token"'; then
     cat >&2 <<EOF
 The GHCR image is not anonymously pullable yet:

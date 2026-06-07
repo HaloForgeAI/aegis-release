@@ -12,7 +12,7 @@ check_url() {
   local label="$1"
   local url="$2"
   local code
-  code="$(curl -LsS -o /dev/null -w '%{http_code}' "$url" || true)"
+  code="$(curl -LsS -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
   if [[ "$code" == "200" ]]; then
     printf 'ok   %s\n' "$label"
   else
@@ -23,7 +23,7 @@ check_url() {
 
 check_ghcr() {
   local response
-  response="$(curl -fsSL 'https://ghcr.io/token?service=ghcr.io&scope=repository:haloforgeai/aegis:pull' || true)"
+  response="$(curl -fsSL 'https://ghcr.io/token?service=ghcr.io&scope=repository:haloforgeai/aegis:pull' 2>/dev/null || true)"
   if printf '%s' "$response" | grep -q '"token"'; then
     printf 'ok   ghcr anonymous pull token\n'
   else
@@ -34,7 +34,7 @@ check_ghcr() {
 
 check_domain() {
   local code
-  code="$(curl -LsS -o /dev/null -w '%{http_code}' --max-time 20 "$DOMAIN" || true)"
+  code="$(curl -LsS -o /dev/null -w '%{http_code}' --max-time 20 "$DOMAIN" 2>/dev/null || true)"
   if [[ "$code" == "200" ]]; then
     printf 'ok   %s\n' "$DOMAIN"
   else
