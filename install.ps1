@@ -25,6 +25,33 @@ function Download-File {
   Invoke-WebRequest -Uri $Url -OutFile $OutFile
 }
 
+function Verify-Checksum {
+  param([string]$SumsPath, [string]$AssetName, [string]$AssetPath)
+  $line = Get-Content $SumsPath | Where-Object { $_ -match [regex]::Escape($AssetName) } | Select-Object -First 1
+  if (-not $line) {
+    throw "Checksum for $AssetName was not found in SHA256SUMS."
+  }
+  $expected = ($line -split '\s+')[0].ToLowerInvariant()
+  $actual = (Get-FileHash -Algorithm SHA256 $AssetPath).Hash.ToLowerInvariant()
+  if ($actual -ne $expected) {
+    throw "Checksum mismatch for $AssetName. Expected $expected, got $actual."
+  }
+}
+
+function Ensure-PublicImageAvailable {
+  $scope = [System.Uri]::EscapeDataString("repository:haloforgeai/aegis:pull")
+  $url = "https://ghcr.io/token?service=ghcr.io&scope=$scope"
+  try {
+    $response = Invoke-RestMethod -Uri $url
+    if (-not $response.token) {
+      throw "No anonymous token returned."
+    }
+  }
+  catch {
+    throw "The GHCR image ghcr.io/haloforgeai/aegis:$AegisVersion is not anonymously pullable yet. Set the package visibility to Public, or run with -NoDocker to install only the local CLI for now."
+  }
+}
+
 function Install-AegisCli {
   Require-Command "Expand-Archive"
   $asset = "aegis-cli-$AegisVersion-x86_64-pc-windows-msvc.zip"
@@ -34,9 +61,15 @@ function Install-AegisCli {
     $archive = Join-Path $tmp $asset
     Write-Host "Downloading $asset..."
     Download-File "$ReleaseBase/$asset" $archive
+    Download-File "$ReleaseBase/SHA256SUMS" (Join-Path $tmp "SHA256SUMS")
+    Verify-Checksum (Join-Path $tmp "SHA256SUMS") $asset $archive
     Expand-Archive -Path $archive -DestinationPath $tmp -Force
+    $exe = Get-ChildItem -Path $tmp -Filter "aegis.exe" -Recurse | Select-Object -First 1
+    if (-not $exe) {
+      throw "Expanded archive did not contain aegis.exe."
+    }
     New-Item -ItemType Directory -Force -Path $AegisBinDir | Out-Null
-    Copy-Item (Join-Path $tmp "aegis.exe") (Join-Path $AegisBinDir "aegis.exe") -Force
+    Copy-Item $exe.FullName (Join-Path $AegisBinDir "aegis.exe") -Force
     Write-Host "Installed aegis CLI to $AegisBinDir\aegis.exe"
   }
   finally {
@@ -46,6 +79,7 @@ function Install-AegisCli {
 
 function Install-AegisCompose {
   Require-Command "docker"
+  Ensure-PublicImageAvailable
   New-Item -ItemType Directory -Force -Path $AegisHome | Out-Null
   Push-Location $AegisHome
   try {

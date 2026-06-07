@@ -59,6 +59,48 @@ download() {
   curl -fsSL "$url" -o "$output"
 }
 
+verify_checksum() {
+  local sums="$1"
+  local asset="$2"
+  local dir="$3"
+  local expected actual
+
+  expected="$(awk -v asset="$asset" '$2 == asset { print $1 }' "$sums")"
+  if [[ -z "$expected" ]]; then
+    echo "Checksum for ${asset} was not found in SHA256SUMS." >&2
+    exit 1
+  fi
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual="$(sha256sum "${dir}/${asset}" | awk '{ print $1 }')"
+  else
+    actual="$(shasum -a 256 "${dir}/${asset}" | awk '{ print $1 }')"
+  fi
+
+  if [[ "$actual" != "$expected" ]]; then
+    echo "Checksum mismatch for ${asset}." >&2
+    echo "Expected: ${expected}" >&2
+    echo "Actual:   ${actual}" >&2
+    exit 1
+  fi
+}
+
+ensure_public_image_available() {
+  local image_scope token_response
+  image_scope="repository:haloforgeai/aegis:pull"
+  token_response="$(curl -fsSL "https://ghcr.io/token?service=ghcr.io&scope=${image_scope}" || true)"
+  if ! printf '%s' "$token_response" | grep -q '"token"'; then
+    cat >&2 <<EOF
+The GHCR image is not anonymously pullable yet:
+  ghcr.io/haloforgeai/aegis:${VERSION}
+
+Set the GitHub Container Registry package visibility to Public, or run with
+--no-docker to install only the local CLI for now.
+EOF
+    exit 1
+  fi
+}
+
 secret_hex() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 32
@@ -89,6 +131,8 @@ install_cli() {
 
   echo "Downloading ${asset}..."
   download "${RELEASE_URL}/${asset}" "${tmp}/${asset}"
+  download "${RELEASE_URL}/SHA256SUMS" "${tmp}/SHA256SUMS"
+  verify_checksum "${tmp}/SHA256SUMS" "$asset" "$tmp"
   mkdir -p "$BIN_DIR"
   tar -xzf "${tmp}/${asset}" -C "$tmp"
   install -m 0755 "${tmp}/aegis-cli-${VERSION}-${target}/aegis" "${BIN_DIR}/aegis"
@@ -98,6 +142,7 @@ install_cli() {
 install_compose() {
   need curl
   need docker
+  ensure_public_image_available
 
   mkdir -p "$AEGIS_HOME"
   cd "$AEGIS_HOME"

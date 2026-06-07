@@ -19,7 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Bash syntax
-        run: bash -n install.sh
+        run: |
+          bash -n install.sh
+          bash -n scripts/check-public-release.sh
       - name: PowerShell syntax
         shell: pwsh
         run: |

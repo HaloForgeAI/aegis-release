@@ -51,6 +51,49 @@ docker pull ghcr.io/haloforgeai/aegis:<tag>
 If anonymous pull asks for credentials, the package is still private or inherited
 private permissions.
 
+The current `gh` token used by local automation must include `read:packages` to
+inspect package metadata through the GitHub REST API. Changing visibility is
+normally done in the GitHub package settings UI:
+
+```text
+https://github.com/orgs/HaloForgeAI/packages/container/package/aegis/settings
+```
+
+Choose Danger Zone -> Change visibility -> Public, then repeat the anonymous
+pull check. GitHub warns that a public package cannot be made private again.
+
+## Cloudflare Pages Domain
+
+The Pages project is `aegis-site` and the target domain is
+`aegis.haloforge.dev`.
+
+The domain can be attached with the Pages Domains API:
+
+```bash
+curl -X POST \
+  "https://api.cloudflare.com/client/v4/accounts/<account_id>/pages/projects/aegis-site/domains" \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data '{"name":"aegis.haloforge.dev"}'
+```
+
+After attachment, Cloudflare still needs DNS to point `aegis.haloforge.dev` to
+the Pages project. If the token lacks DNS edit permission, create the DNS record
+from the Cloudflare dashboard:
+
+```text
+Type: CNAME
+Name: aegis
+Target: aegis-site-8ib.pages.dev
+Proxy: enabled
+```
+
+Verify:
+
+```bash
+curl -I https://aegis.haloforge.dev
+```
+
 ## Website Update
 
 Only after the anonymous checks pass should `HaloForgeAI/aegis-site` promote the

@@ -28,6 +28,12 @@ The intended public install shape is:
 curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.sh | bash
 ```
 
+CLI only while GHCR is still private:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.sh | bash -s -- --no-docker
+```
+
 Windows PowerShell:
 
 ```powershell
@@ -58,6 +64,7 @@ For users who want to inspect and run the public Docker stack manually:
 mkdir -p ~/.aegis/self-host
 cd ~/.aegis/self-host
 curl -fsSLO https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/compose/aegis.compose.yml
+curl -fsSLO https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/.env.example
 cp .env.example .env
 docker compose --env-file .env -f aegis.compose.yml up -d
 ```
@@ -80,3 +87,14 @@ printf 'AEGIS_AUTH_SECRET=%s\n' "$(openssl rand -hex 32)" >> .env
    quickstart from "launch target" to "available".
 
 More detail lives in [docs/PUBLIC-RELEASE-RUNBOOK.md](docs/PUBLIC-RELEASE-RUNBOOK.md).
+
+## Public Launch Check
+
+Maintainers can check the public gates with:
+
+```bash
+scripts/check-public-release.sh v0.1.1
+```
+
+This verifies public GitHub Release downloads, GHCR anonymous token access, and
+the Cloudflare Pages custom domain.
