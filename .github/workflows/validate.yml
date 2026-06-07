@@ -22,10 +22,12 @@ jobs:
         run: |
           bash -n install.sh
           bash -n scripts/check-public-release.sh
+          bash -n scripts/aegis-stop.sh
       - name: PowerShell syntax
         shell: pwsh
         run: |
           $null = [scriptblock]::Create((Get-Content -Raw install.ps1))
+          $null = [scriptblock]::Create((Get-Content -Raw scripts/aegis-stop.ps1))
       - name: Public compose shape
         run: |
           grep -q 'ghcr.io/haloforgeai/aegis' compose/aegis.compose.yml

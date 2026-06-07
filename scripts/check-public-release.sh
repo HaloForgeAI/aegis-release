@@ -26,8 +26,21 @@ check_ghcr() {
   response="$(curl -fsSL 'https://ghcr.io/token?service=ghcr.io&scope=repository:haloforgeai/aegis:pull' 2>/dev/null || true)"
   if printf '%s' "$response" | grep -q '"token"'; then
     printf 'ok   ghcr anonymous pull token\n'
+    return 0
+  fi
+
+  printf 'warn ghcr anonymous pull token unavailable\n'
+  return 1
+}
+
+check_image_archive() {
+  local url code
+  url="${RELEASE_URL}/aegis-server-${VERSION}-linux-amd64.docker.tar.gz"
+  code="$(curl -LsS -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
+  if [[ "$code" == "200" ]]; then
+    printf 'ok   Docker image archive fallback\n'
   else
-    printf 'fail ghcr anonymous pull token\n'
+    printf 'fail Docker image archive fallback HTTP %s\n' "$code"
     status=1
   fi
 }
@@ -46,7 +59,9 @@ check_domain() {
 check_url "SHA256SUMS" "${RELEASE_URL}/SHA256SUMS"
 check_url "macOS arm64 CLI" "${RELEASE_URL}/aegis-cli-${VERSION}-aarch64-apple-darwin.tar.gz"
 check_url "Windows x64 CLI" "${RELEASE_URL}/aegis-cli-${VERSION}-x86_64-pc-windows-msvc.zip"
-check_ghcr
+if ! check_ghcr; then
+  check_image_archive
+fi
 check_domain
 
 exit "$status"

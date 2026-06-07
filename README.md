@@ -1,92 +1,185 @@
 # Aegis Public Release
 
-Public distribution surface for Aegis, the HaloForgeAI AI chief-of-staff.
+Public installers and release assets for Aegis, the HaloForgeAI AI chief-of-staff.
 
-This repository is intentionally small. It does not mirror the private Aegis
-source tree. It hosts the public onboarding layer: install scripts, compose
-templates, checksums, and GitHub Releases that can be downloaded by users who do
-not have access to `HaloForgeAI/Aegis`.
+This repository is the user-facing distribution layer. The private source repo
+builds the server image and CLI binaries; this public repo hosts the install
+scripts, compose template, checksums, and downloadable release assets.
 
-## Repository Roles
+## Pick An Install Mode
 
-| Repository | Visibility | Owns |
+| Mode | Use when | What runs locally |
 | --- | --- | --- |
-| `HaloForgeAI/Aegis` | Private | Runtime source, Dockerfiles, release workflow, internal docs, implementation decisions |
-| `HaloForgeAI/aegis-release` | Public | Public installer, public compose template, release assets, checksums, install runbooks |
-| `HaloForgeAI/aegis-site` | Public | Brand site, public quickstart copy, SEO, Cloudflare Pages deployment |
-| `HaloForgeAI/aegis-agent-plugins` | Public | Codex, Claude Code, and agent plugin distribution |
+| Full self-host | You want your own Aegis Server on this machine | Docker control plane plus the `aegis` CLI |
+| Local Gateway only | You already have an Aegis Server URL and owner token | `aegis` CLI and Local Gateway, no local Docker stack |
+| Agent plugin | You mainly use Codex, Claude Code, or another MCP client | Agent plugin connects to an existing Aegis Server |
 
-Do not hand-edit generated release assets here. CLI archives and `SHA256SUMS`
-should be produced by the private Aegis release workflow, then mirrored into
-GitHub Releases in this repository.
+The recommended shape is hybrid: Docker runs the durable control plane, while
+the Local Gateway stays on your host so Aegis can use your files, terminal,
+browser, GUI, and local MCP servers with explicit tool-call evidence.
 
-## Current Launch Target
+## Before You Install
 
-The intended public install shape is:
+Required for full self-host:
+
+- macOS Apple Silicon or Windows x64.
+- Docker Desktop or Docker Engine with Compose v2.
+- Internet access to GitHub Releases and GHCR, or the public Docker archive
+  fallback attached to the same release.
+
+Required for CLI / Local Gateway only:
+
+- macOS Apple Silicon or Windows x64.
+- An existing Aegis Server URL.
+- An owner access token for that server.
+
+Optional, depending on what you want Aegis to do:
+
+- LLM provider credentials: `AEGIS_LLM_BASE_URL`, `AEGIS_LLM_MODEL`,
+  `AEGIS_LLM_API_KEY`.
+- Telegram bot token from BotFather: `AEGIS_TELEGRAM_BOT_TOKEN`.
+- Other channel secrets as they become available.
+- Agent plugins from
+  [`HaloForgeAI/aegis-agent-plugins`](https://github.com/HaloForgeAI/aegis-agent-plugins).
+
+Channels are not mandatory. You can start with the CLI, an agent plugin, or MCP
+access first, then add Telegram or other channels later.
+
+## macOS Full Self-Host
+
+This installs the macOS arm64 CLI, creates `~/.aegis/self-host`, writes a local
+`.env`, starts Docker Compose, and stores a bootstrap owner token under
+`~/.aegis/self-host/.aegis/access-token.txt`.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.sh | bash
 ```
 
-CLI only while GHCR is still private:
+Pin a release:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.sh | bash -s -- --no-docker
+curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.sh | AEGIS_VERSION=v0.1.1 bash
 ```
 
-Windows PowerShell:
+Check the install:
+
+```bash
+~/.local/bin/aegis --root ~/.aegis/self-host status
+~/.local/bin/aegis --root ~/.aegis/self-host onboarding doctor
+~/.local/bin/aegis --root ~/.aegis/self-host worker tools --no-exec
+```
+
+## Windows Full Self-Host
+
+Run PowerShell as the user who will own the install:
 
 ```powershell
 iwr https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.ps1 -OutFile install-aegis.ps1
 powershell -ExecutionPolicy Bypass -File .\install-aegis.ps1
 ```
 
-The installer expects public assets for the chosen `AEGIS_VERSION`.
+Pin a release:
 
-```bash
-AEGIS_VERSION=v0.1.1 bash install.sh
+```powershell
+$env:AEGIS_VERSION = "v0.1.1"
+powershell -ExecutionPolicy Bypass -File .\install-aegis.ps1
 ```
 
-Required public gates before promoting this as generally available:
+Check the install:
 
-- `docker pull ghcr.io/haloforgeai/aegis:<tag>` works anonymously.
-- The matching `aegis-cli-<tag>-aarch64-apple-darwin.tar.gz` release asset is
-  attached to this public repository.
-- The matching `aegis-cli-<tag>-x86_64-pc-windows-msvc.zip` release asset is
-  attached to this public repository.
-- `SHA256SUMS` covers every public CLI archive.
+```powershell
+~\.aegis\bin\aegis.exe --root "$HOME\.aegis\self-host" status
+~\.aegis\bin\aegis.exe --root "$HOME\.aegis\self-host" onboarding doctor
+~\.aegis\bin\aegis.exe --root "$HOME\.aegis\self-host" worker tools --no-exec
+```
 
-## Compose Only
+## No Docker: Local Gateway Only
 
-For users who want to inspect and run the public Docker stack manually:
+Use this when an Aegis Server is already running somewhere else. The installer
+downloads only the CLI, writes the server URL into the local `.env`, and stores
+the owner token for CLI/Gateway calls.
+
+macOS:
 
 ```bash
-mkdir -p ~/.aegis/self-host
+curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.sh | \
+  AEGIS_SERVER_URL="https://aegis.example.com" \
+  AEGIS_ACCESS_TOKEN="paste-owner-token-here" \
+  bash -s -- --no-docker
+```
+
+Windows:
+
+```powershell
+$env:AEGIS_SERVER_URL = "https://aegis.example.com"
+$env:AEGIS_ACCESS_TOKEN = "paste-owner-token-here"
+iwr https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.ps1 -OutFile install-aegis.ps1
+powershell -ExecutionPolicy Bypass -File .\install-aegis.ps1 -NoDocker
+```
+
+After that, start the Local Gateway for the workspace you want Aegis to operate:
+
+```bash
+aegis --root ~/.aegis/self-host local-gateway --workspace-root ~/work --max-workers 2
+```
+
+## Configure Optional Channels
+
+For a self-host install, edit `~/.aegis/self-host/.env` and restart the stack.
+
+```bash
 cd ~/.aegis/self-host
-curl -fsSLO https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/compose/aegis.compose.yml
-curl -fsSLO https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/.env.example
-cp .env.example .env
-docker compose --env-file .env -f aegis.compose.yml up -d
+$EDITOR .env
+docker compose -p aegis --env-file .env -f docker/docker-compose.yml up -d
 ```
 
-Generate secrets locally and keep them out of Git:
+Common optional keys:
+
+```dotenv
+AEGIS_LLM_BASE_URL=https://api.openai.com/v1
+AEGIS_LLM_MODEL=gpt-4.1
+AEGIS_LLM_API_KEY=...
+
+AEGIS_TELEGRAM_BOT_TOKEN=...
+AEGIS_TELEGRAM_TENANT=studio-a
+AEGIS_TELEGRAM_MODE=polling
+```
+
+Telegram bot tokens are created with BotFather. Channels are optional; agent
+plugins and MCP can be your first interface.
+
+## Stop Or Remove
+
+macOS:
 
 ```bash
-printf 'AEGIS_AUTH_SECRET=%s\n' "$(openssl rand -hex 32)" >> .env
+~/.aegis/self-host/scripts/aegis-stop.sh
+~/.aegis/self-host/scripts/aegis-stop.sh --remove
+~/.aegis/self-host/scripts/aegis-stop.sh --purge
 ```
 
-## Maintainer Flow
+Windows:
 
-1. Change runtime behavior in `HaloForgeAI/Aegis`.
-2. Tag Aegis, for example `v0.1.1`.
-3. Run the private Aegis release workflow.
-4. Confirm the workflow pushed `ghcr.io/haloforgeai/aegis:<tag>`.
-5. Confirm the workflow mirrored CLI assets and checksums to this repository's
-   public GitHub Release.
-6. Test anonymous install from a clean machine before changing the brand site
-   quickstart from "launch target" to "available".
+```powershell
+& "$HOME\.aegis\self-host\scripts\aegis-stop.ps1"
+& "$HOME\.aegis\self-host\scripts\aegis-stop.ps1" -Remove
+& "$HOME\.aegis\self-host\scripts\aegis-stop.ps1" -Purge
+```
 
-More detail lives in [docs/PUBLIC-RELEASE-RUNBOOK.md](docs/PUBLIC-RELEASE-RUNBOOK.md).
+`--purge` / `-Purge` removes Docker volumes, including local database data.
+
+## Repository Roles
+
+| Repository | Visibility | Owns |
+| --- | --- | --- |
+| `HaloForgeAI/Aegis` | Private | Runtime source, Dockerfiles, release workflow, internal docs, implementation decisions |
+| `HaloForgeAI/aegis-release` | Public | Public installers, compose template, release assets, checksums, install runbooks |
+| `HaloForgeAI/aegis-site` | Public | Brand site, quickstart copy, SEO, Cloudflare Pages deployment |
+| `HaloForgeAI/aegis-agent-plugins` | Public | Codex, Claude Code, and agent plugin distribution |
+
+Do not hand-edit generated release assets here. CLI archives, Docker archives,
+and `SHA256SUMS` should be produced by the private Aegis release workflow, then
+mirrored into GitHub Releases in this repository.
 
 ## Public Launch Check
 
@@ -96,5 +189,7 @@ Maintainers can check the public gates with:
 scripts/check-public-release.sh v0.1.1
 ```
 
-This verifies public GitHub Release downloads, GHCR anonymous token access, and
-the Cloudflare Pages custom domain.
+The check verifies GitHub Release downloads, GHCR anonymous access or the Docker
+archive fallback, and the Cloudflare Pages custom domain.
+
+More detail lives in [docs/PUBLIC-RELEASE-RUNBOOK.md](docs/PUBLIC-RELEASE-RUNBOOK.md).

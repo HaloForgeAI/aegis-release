@@ -5,9 +5,11 @@ REPO="${AEGIS_RELEASE_REPO:-HaloForgeAI/aegis-release}"
 BRANCH="${AEGIS_RELEASE_BRANCH:-main}"
 VERSION="${AEGIS_VERSION:-v0.1.1}"
 AEGIS_HOME="${AEGIS_HOME:-$HOME/.aegis/self-host}"
+AEGIS_ROOT_FILE="${AEGIS_ROOT_FILE:-$HOME/.aegis/root.txt}"
 BIN_DIR="${AEGIS_BIN_DIR:-$HOME/.local/bin}"
 BASE_RAW_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 RELEASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
+TOKEN_FILE="${AEGIS_TOKEN_FILE:-$AEGIS_HOME/.aegis/access-token.txt}"
 
 usage() {
   cat <<'USAGE'
@@ -18,6 +20,8 @@ Environment:
   AEGIS_HOME           Self-host directory, default ~/.aegis/self-host
   AEGIS_BIN_DIR        CLI install directory, default ~/.local/bin
   AEGIS_RELEASE_REPO   Release repository, default HaloForgeAI/aegis-release
+  AEGIS_ACCESS_TOKEN   Existing owner token for CLI/Local Gateway-only installs
+  AEGIS_SERVER_URL     Existing Aegis API URL for CLI/Local Gateway-only installs
 USAGE
 }
 
@@ -90,15 +94,31 @@ ensure_public_image_available() {
   image_scope="repository:haloforgeai/aegis:pull"
   token_response="$(curl -fsSL "https://ghcr.io/token?service=ghcr.io&scope=${image_scope}" 2>/dev/null || true)"
   if ! printf '%s' "$token_response" | grep -q '"token"'; then
-    cat >&2 <<EOF
-The GHCR image is not anonymously pullable yet:
-  ghcr.io/haloforgeai/aegis:${VERSION}
+    load_image_archive
+  fi
+}
 
-Set the GitHub Container Registry package visibility to Public, or run with
---no-docker to install only the local CLI for now.
+load_image_archive() {
+  local asset tmp
+  asset="aegis-server-${VERSION}-linux-amd64.docker.tar.gz"
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' RETURN
+
+  echo "GHCR is not anonymously pullable yet; downloading ${asset}..."
+  if ! download "${RELEASE_URL}/${asset}" "${tmp}/${asset}"; then
+    cat >&2 <<EOF
+The GHCR image is not anonymously pullable and the public Docker archive was not found:
+  ${RELEASE_URL}/${asset}
+
+Set the GitHub Container Registry package visibility to Public, publish the
+Docker archive release asset, or run with --no-docker to install only the local
+CLI for now.
 EOF
     exit 1
   fi
+  download "${RELEASE_URL}/SHA256SUMS" "${tmp}/SHA256SUMS"
+  verify_checksum "${tmp}/SHA256SUMS" "$asset" "$tmp"
+  docker load --input "${tmp}/${asset}"
 }
 
 secret_hex() {
@@ -106,6 +126,85 @@ secret_hex() {
     openssl rand -hex 32
   else
     date +%s | shasum -a 256 | awk '{print $1}'
+  fi
+}
+
+ensure_root_scaffold() {
+  mkdir -p "$AEGIS_HOME/docker" "$AEGIS_HOME/scripts" "$AEGIS_HOME/.aegis" "$(dirname "$AEGIS_ROOT_FILE")"
+  printf '%s\n' "$AEGIS_HOME" > "$AEGIS_ROOT_FILE"
+  if [[ ! -f "$AEGIS_HOME/Cargo.toml" ]]; then
+    cat > "$AEGIS_HOME/Cargo.toml" <<'EOF'
+[workspace]
+# Public Aegis install root marker.
+EOF
+  fi
+}
+
+install_root_files() {
+  ensure_root_scaffold
+  download "${BASE_RAW_URL}/compose/aegis.compose.yml" "$AEGIS_HOME/docker/docker-compose.yml"
+  download "${BASE_RAW_URL}/scripts/aegis-stop.sh" "$AEGIS_HOME/scripts/aegis-stop.sh"
+  chmod +x "$AEGIS_HOME/scripts/aegis-stop.sh"
+}
+
+write_env_key() {
+  local key="$1"
+  local value="$2"
+  local escaped
+  escaped="${value//\\/\\\\}"
+  escaped="${escaped//\"/\\\"}"
+  escaped="${escaped//\$/\\$}"
+  escaped="${escaped//\`/\\\`}"
+  if [[ ! -f "$AEGIS_HOME/.env" ]]; then
+    touch "$AEGIS_HOME/.env"
+  fi
+  if grep -qE "^${key}=" "$AEGIS_HOME/.env"; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      sed -i '' "s|^${key}=.*|${key}=\"${escaped}\"|" "$AEGIS_HOME/.env"
+    else
+      sed -i "s|^${key}=.*|${key}=\"${escaped}\"|" "$AEGIS_HOME/.env"
+    fi
+  else
+    printf '%s="%s"\n' "$key" "$escaped" >> "$AEGIS_HOME/.env"
+  fi
+}
+
+mint_token() {
+  local secret tenant
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "Cannot mint owner token: openssl is required." >&2
+    exit 1
+  fi
+  secret="$(awk -F= '$1 == "AEGIS_AUTH_SECRET" { gsub(/^\"|\"$/, "", $2); print $2 }' "$AEGIS_HOME/.env" | tail -n 1)"
+  tenant="$(awk -F= '$1 == "AEGIS_BOOTSTRAP_TENANT" { gsub(/^\"|\"$/, "", $2); print $2 }' "$AEGIS_HOME/.env" | tail -n 1)"
+  tenant="${tenant:-studio-a}"
+  if [[ -z "$secret" ]]; then
+    echo "Cannot mint owner token: AEGIS_AUTH_SECRET is missing." >&2
+    exit 1
+  fi
+  mkdir -p "$(dirname "$TOKEN_FILE")"
+  local exp header payload signing_input signature
+  exp="$(($(date +%s) + 30 * 24 * 3600))"
+  header='{"alg":"HS256","typ":"JWT"}'
+  payload='{"sub":"bootstrap-owner","tid":"'"$tenant"'","role":"owner","typ":"access","exp":'"$exp"'}'
+  signing_input="$(printf '%s' "$header" | openssl base64 -A | tr '+/' '-_' | tr -d '=').$(printf '%s' "$payload" | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
+  signature="$(printf '%s' "$signing_input" | openssl dgst -sha256 -hmac "$secret" -binary | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
+  printf '%s.%s\n' "$signing_input" "$signature" > "$TOKEN_FILE"
+  chmod 600 "$TOKEN_FILE"
+}
+
+configure_existing_control_plane() {
+  install_root_files
+  if [[ -z "${AEGIS_SERVER_URL:-}" && -z "${AEGIS_ACCESS_TOKEN:-}" ]]; then
+    return
+  fi
+  if [[ -n "${AEGIS_SERVER_URL:-}" ]]; then
+    write_env_key AEGIS_API_URL "${AEGIS_SERVER_URL%/}"
+  fi
+  if [[ -n "${AEGIS_ACCESS_TOKEN:-}" ]]; then
+    mkdir -p "$(dirname "$TOKEN_FILE")"
+    printf '%s\n' "$AEGIS_ACCESS_TOKEN" > "$TOKEN_FILE"
+    chmod 600 "$TOKEN_FILE"
   fi
 }
 
@@ -142,12 +241,13 @@ install_cli() {
 install_compose() {
   need curl
   need docker
+  need openssl
+  install_root_files
   ensure_public_image_available
 
   mkdir -p "$AEGIS_HOME"
   cd "$AEGIS_HOME"
 
-  download "${BASE_RAW_URL}/compose/aegis.compose.yml" "aegis.compose.yml"
   if [[ ! -f .env ]]; then
     download "${BASE_RAW_URL}/.env.example" ".env"
     auth_secret="$(secret_hex)"
@@ -157,8 +257,18 @@ install_compose() {
       sed -i "s/^AEGIS_AUTH_SECRET=.*/AEGIS_AUTH_SECRET=${auth_secret}/" .env
     fi
   fi
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    sed -i '' "s/^AEGIS_VERSION=.*/AEGIS_VERSION=${VERSION}/" .env
+    sed -i '' "s|^AEGIS_IMAGE=.*|AEGIS_IMAGE=ghcr.io/haloforgeai/aegis:${VERSION}|" .env
+  else
+    sed -i "s/^AEGIS_VERSION=.*/AEGIS_VERSION=${VERSION}/" .env
+    sed -i "s|^AEGIS_IMAGE=.*|AEGIS_IMAGE=ghcr.io/haloforgeai/aegis:${VERSION}|" .env
+  fi
+  write_env_key AEGIS_API_URL "${AEGIS_API_URL:-http://localhost:8787}"
+  write_env_key AEGIS_BOOTSTRAP_TENANT "${AEGIS_BOOTSTRAP_TENANT:-studio-a}"
+  mint_token
 
-  docker compose --env-file .env -f aegis.compose.yml up -d
+  docker compose -p aegis --env-file .env -f docker/docker-compose.yml up -d
 }
 
 if [[ "$NO_CLI" -eq 0 ]]; then
@@ -167,6 +277,8 @@ fi
 
 if [[ "$NO_DOCKER" -eq 0 ]]; then
   install_compose
+else
+  configure_existing_control_plane
 fi
 
 cat <<EOF
@@ -174,6 +286,7 @@ cat <<EOF
 Aegis install path is ready.
 
 Next checks:
+  ${BIN_DIR}/aegis --root ${AEGIS_HOME} status
   ${BIN_DIR}/aegis status
   ${BIN_DIR}/aegis onboarding doctor
   ${BIN_DIR}/aegis worker tools --no-exec
