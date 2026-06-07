@@ -158,6 +158,11 @@ function Ensure-PublicImageAvailable {
     if (-not $response.token) {
       throw "No anonymous token returned."
     }
+    $headers = @{
+      Authorization = "Bearer $($response.token)"
+      Accept = "application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json"
+    }
+    Invoke-WebRequest -Uri "https://ghcr.io/v2/haloforgeai/aegis/manifests/$AegisVersion" -Method Head -Headers $headers -UseBasicParsing | Out-Null
   }
   catch {
     Load-ImageArchive
@@ -170,12 +175,12 @@ function Load-ImageArchive {
   New-Item -ItemType Directory -Force -Path $tmp | Out-Null
   try {
     $archive = Join-Path $tmp $asset
-    Write-Host "GHCR is not anonymously pullable yet; downloading $asset..."
+    Write-Host "Public GHCR image was not reachable; downloading recovery archive $asset..."
     try {
       Download-File "$ReleaseBase/$asset" $archive
     }
     catch {
-      throw "The GHCR image ghcr.io/haloforgeai/aegis:$AegisVersion is not anonymously pullable and $asset is not attached to the public release. Set the package visibility to Public, publish the Docker archive release asset, or run with -WorkerOnly to connect this machine to an existing Aegis Server."
+      throw "The official GHCR image ghcr.io/haloforgeai/aegis:$AegisVersion was not reachable and $asset is not attached to the public release. Confirm the image is public and published, publish the Docker recovery archive asset, or run with -WorkerOnly to connect this machine to an existing Aegis Server."
     }
     Download-File "$ReleaseBase/SHA256SUMS" (Join-Path $tmp "SHA256SUMS")
     Verify-Checksum (Join-Path $tmp "SHA256SUMS") $asset $archive

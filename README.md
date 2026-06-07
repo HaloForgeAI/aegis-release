@@ -28,8 +28,7 @@ Required for full self-host:
 
 - macOS Apple Silicon or Windows x64.
 - Docker Desktop or Docker Engine with Compose v2.
-- Internet access to GitHub Releases and GHCR, or the public Docker archive
-  fallback attached to the same release.
+- Internet access to GitHub Releases and public GHCR.
 
 Required for worker-only:
 
@@ -189,9 +188,9 @@ aegis --root ~/.aegis/self-host down --purge
 | `HaloForgeAI/aegis-site` | Public | Brand site, quickstart copy, SEO, Cloudflare Pages deployment |
 | `HaloForgeAI/aegis-agent-plugins` | Public | Codex, Claude Code, and agent plugin distribution |
 
-Do not hand-edit generated release assets here. CLI archives, Docker archives,
-and `SHA256SUMS` should be produced by the private Aegis release workflow, then
-mirrored into GitHub Releases in this repository.
+Do not hand-edit generated release assets here. CLI archives, the optional
+Docker recovery archive, and `SHA256SUMS` should be produced by the private
+Aegis release workflow, then mirrored into GitHub Releases in this repository.
 
 ## Public Launch Check
 
@@ -201,7 +200,9 @@ Maintainers can check the public gates with:
 scripts/check-public-release.sh v0.1.2
 ```
 
-The check verifies GitHub Release downloads, GHCR anonymous access or the Docker
-archive fallback, and the Cloudflare Pages custom domain.
+The check verifies GitHub Release downloads, GHCR anonymous image access, the
+Docker recovery archive, and the Cloudflare Pages custom domain. GHCR is a hard
+public launch gate; the archive is checked as a backup asset, not as a substitute
+for the official image path.
 
 More detail lives in [docs/PUBLIC-RELEASE-RUNBOOK.md](docs/PUBLIC-RELEASE-RUNBOOK.md).

@@ -95,10 +95,20 @@ verify_checksum() {
 }
 
 ensure_public_image_available() {
-  local image_scope token_response
+  local image_scope token_response token code
   image_scope="repository:haloforgeai/aegis:pull"
   token_response="$(curl -fsSL "https://ghcr.io/token?service=ghcr.io&scope=${image_scope}" 2>/dev/null || true)"
-  if ! printf '%s' "$token_response" | grep -q '"token"'; then
+  token="$(printf '%s' "$token_response" | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+  if [[ -z "$token" ]]; then
+    load_image_archive
+    return
+  fi
+
+  code="$(curl -LsS -o /dev/null -w '%{http_code}' \
+    -H "Authorization: Bearer ${token}" \
+    -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json' \
+    "https://ghcr.io/v2/haloforgeai/aegis/manifests/${VERSION}" 2>/dev/null || true)"
+  if [[ "$code" != "200" ]]; then
     load_image_archive
   fi
 }
@@ -109,15 +119,15 @@ load_image_archive() {
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' RETURN
 
-  echo "GHCR is not anonymously pullable yet; downloading ${asset}..."
+  echo "Public GHCR image was not reachable; downloading recovery archive ${asset}..."
   if ! download "${RELEASE_URL}/${asset}" "${tmp}/${asset}"; then
     cat >&2 <<EOF
-The GHCR image is not anonymously pullable and the public Docker archive was not found:
+The official GHCR image was not reachable and the Docker recovery archive was not found:
   ${RELEASE_URL}/${asset}
 
-Set the GitHub Container Registry package visibility to Public, publish the
-Docker archive release asset, or run with --worker-only to connect this machine
-to an existing Aegis Server.
+Confirm ghcr.io/haloforgeai/aegis:${VERSION} is public and published, publish the
+Docker recovery archive release asset, or run with --worker-only to connect this
+machine to an existing Aegis Server.
 EOF
     exit 1
   fi
