@@ -11,12 +11,16 @@ scripts, compose template, checksums, and downloadable release assets.
 | Mode | Use when | What runs locally |
 | --- | --- | --- |
 | Full self-host | You want your own Aegis Server on this machine | Docker control plane plus the `aegis` CLI |
-| Local Gateway only | You already have an Aegis Server URL and owner token | `aegis` CLI and Local Gateway, no local Docker stack |
+| Worker-only | You already have an Aegis Server URL and owner token | `aegis` CLI and Local Gateway worker |
 | Agent plugin | You mainly use Codex, Claude Code, or another MCP client | Agent plugin connects to an existing Aegis Server |
 
 The recommended shape is hybrid: Docker runs the durable control plane, while
 the Local Gateway stays on your host so Aegis can use your files, terminal,
 browser, GUI, and local MCP servers with explicit tool-call evidence.
+
+There is no public standalone non-Docker Aegis Server installer. If you need a
+server, use the full Docker self-host path. Worker-only installs connect this
+machine to a server that already exists.
 
 ## Before You Install
 
@@ -27,7 +31,7 @@ Required for full self-host:
 - Internet access to GitHub Releases and GHCR, or the public Docker archive
   fallback attached to the same release.
 
-Required for CLI / Local Gateway only:
+Required for worker-only:
 
 - macOS Apple Silicon or Windows x64.
 - An existing Aegis Server URL.
@@ -93,11 +97,12 @@ Check the install:
 ~\.aegis\bin\aegis.exe --root "$HOME\.aegis\self-host" worker tools --no-exec
 ```
 
-## No Docker: Local Gateway Only
+## Worker-Only: Connect This Machine
 
-Use this when an Aegis Server is already running somewhere else. The installer
-downloads only the CLI, writes the server URL into the local `.env`, and stores
-the owner token for CLI/Gateway calls.
+Use this when an Aegis Server is already running somewhere else. This is not a
+non-Docker Aegis Server install. The installer downloads the CLI, writes the
+server URL into the local `.env`, stores the owner token, and prepares this
+machine to run Local Gateway worker slots.
 
 macOS:
 
@@ -105,7 +110,7 @@ macOS:
 curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.sh | \
   AEGIS_SERVER_URL="https://aegis.example.com" \
   AEGIS_ACCESS_TOKEN="paste-owner-token-here" \
-  bash -s -- --no-docker
+  bash -s -- --worker-only
 ```
 
 Windows:
@@ -114,7 +119,7 @@ Windows:
 $env:AEGIS_SERVER_URL = "https://aegis.example.com"
 $env:AEGIS_ACCESS_TOKEN = "paste-owner-token-here"
 iwr https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.ps1 -OutFile install-aegis.ps1
-powershell -ExecutionPolicy Bypass -File .\install-aegis.ps1 -NoDocker
+powershell -ExecutionPolicy Bypass -File .\install-aegis.ps1 -WorkerOnly
 ```
 
 After that, start the Local Gateway for the workspace you want Aegis to operate:

@@ -13,25 +13,30 @@ TOKEN_FILE="${AEGIS_TOKEN_FILE:-$AEGIS_HOME/.aegis/access-token.txt}"
 
 usage() {
   cat <<'USAGE'
-Usage: install.sh [--no-docker] [--no-cli]
+Usage: install.sh [--worker-only] [--no-cli]
 
 Environment:
   AEGIS_VERSION        Release tag to install, default v0.1.1
   AEGIS_HOME           Self-host directory, default ~/.aegis/self-host
   AEGIS_BIN_DIR        CLI install directory, default ~/.local/bin
   AEGIS_RELEASE_REPO   Release repository, default HaloForgeAI/aegis-release
-  AEGIS_ACCESS_TOKEN   Existing owner token for CLI/Local Gateway-only installs
-  AEGIS_SERVER_URL     Existing Aegis API URL for CLI/Local Gateway-only installs
+  AEGIS_ACCESS_TOKEN   Existing owner token for worker-only installs
+  AEGIS_SERVER_URL     Existing Aegis Server API URL for worker-only installs
 USAGE
 }
 
-NO_DOCKER=0
+WORKER_ONLY=0
 NO_CLI=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --worker-only)
+      WORKER_ONLY=1
+      shift
+      ;;
     --no-docker)
-      NO_DOCKER=1
+      echo "Warning: --no-docker is deprecated; use --worker-only." >&2
+      WORKER_ONLY=1
       shift
       ;;
     --no-cli)
@@ -111,8 +116,8 @@ The GHCR image is not anonymously pullable and the public Docker archive was not
   ${RELEASE_URL}/${asset}
 
 Set the GitHub Container Registry package visibility to Public, publish the
-Docker archive release asset, or run with --no-docker to install only the local
-CLI for now.
+Docker archive release asset, or run with --worker-only to connect this machine
+to an existing Aegis Server.
 EOF
     exit 1
   fi
@@ -197,19 +202,22 @@ mint_token() {
   chmod 600 "$TOKEN_FILE"
 }
 
-configure_existing_control_plane() {
+configure_worker_only() {
+  if [[ -z "${AEGIS_SERVER_URL:-}" || -z "${AEGIS_ACCESS_TOKEN:-}" ]]; then
+    cat >&2 <<'EOF'
+Worker-only install requires both:
+  AEGIS_SERVER_URL     Existing Aegis Server URL
+  AEGIS_ACCESS_TOKEN   Owner token for that server
+
+This does not install a standalone non-Docker Aegis Server.
+EOF
+    exit 1
+  fi
   install_root_files
-  if [[ -z "${AEGIS_SERVER_URL:-}" && -z "${AEGIS_ACCESS_TOKEN:-}" ]]; then
-    return
-  fi
-  if [[ -n "${AEGIS_SERVER_URL:-}" ]]; then
-    write_env_key AEGIS_API_URL "${AEGIS_SERVER_URL%/}"
-  fi
-  if [[ -n "${AEGIS_ACCESS_TOKEN:-}" ]]; then
-    mkdir -p "$(dirname "$TOKEN_FILE")"
-    printf '%s\n' "$AEGIS_ACCESS_TOKEN" > "$TOKEN_FILE"
-    chmod 600 "$TOKEN_FILE"
-  fi
+  write_env_key AEGIS_API_URL "${AEGIS_SERVER_URL%/}"
+  mkdir -p "$(dirname "$TOKEN_FILE")"
+  printf '%s\n' "$AEGIS_ACCESS_TOKEN" > "$TOKEN_FILE"
+  chmod 600 "$TOKEN_FILE"
 }
 
 install_cli() {
@@ -275,17 +283,38 @@ install_compose() {
   docker compose -p aegis --env-file .env -f docker/docker-compose.yml up -d
 }
 
+if [[ "$WORKER_ONLY" -eq 1 && "$NO_CLI" -eq 1 ]]; then
+  echo "Worker-only install requires the aegis CLI; remove --no-cli." >&2
+  exit 1
+fi
+
 if [[ "$NO_CLI" -eq 0 ]]; then
   install_cli
 fi
 
-if [[ "$NO_DOCKER" -eq 0 ]]; then
-  install_compose
+if [[ "$WORKER_ONLY" -eq 1 ]]; then
+  configure_worker_only
 else
-  configure_existing_control_plane
+  install_compose
 fi
 
-cat <<EOF
+if [[ "$WORKER_ONLY" -eq 1 ]]; then
+  cat <<EOF
+
+Aegis worker-only install is ready.
+
+This machine is configured to connect to:
+  ${AEGIS_SERVER_URL%/}
+
+Next checks:
+  ${BIN_DIR}/aegis --root ${AEGIS_HOME} status --no-compose
+  ${BIN_DIR}/aegis --root ${AEGIS_HOME} worker tools --no-exec
+  ${BIN_DIR}/aegis --root ${AEGIS_HOME} local-gateway --workspace-root "\$HOME/work" --max-workers 2
+
+If ${BIN_DIR} is not on PATH, add it to your shell profile.
+EOF
+else
+  cat <<EOF
 
 Aegis install path is ready.
 
@@ -297,3 +326,4 @@ Next checks:
 
 If ${BIN_DIR} is not on PATH, add it to your shell profile.
 EOF
+fi

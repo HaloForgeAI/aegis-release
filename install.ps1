@@ -5,6 +5,7 @@ param(
   [string]$AegisBinDir = $(if ($env:AEGIS_BIN_DIR) { $env:AEGIS_BIN_DIR } else { Join-Path $HOME ".aegis\bin" }),
   [string]$ReleaseRepo = $(if ($env:AEGIS_RELEASE_REPO) { $env:AEGIS_RELEASE_REPO } else { "HaloForgeAI/aegis-release" }),
   [string]$ReleaseBranch = $(if ($env:AEGIS_RELEASE_BRANCH) { $env:AEGIS_RELEASE_BRANCH } else { "main" }),
+  [switch]$WorkerOnly,
   [switch]$NoDocker,
   [switch]$NoCli
 )
@@ -14,6 +15,14 @@ $ErrorActionPreference = "Stop"
 $RawBase = "https://raw.githubusercontent.com/$ReleaseRepo/$ReleaseBranch"
 $ReleaseBase = "https://github.com/$ReleaseRepo/releases/download/$AegisVersion"
 $TokenFile = Join-Path $AegisHome ".aegis\access-token.txt"
+$WorkerInstall = [bool]$WorkerOnly -or [bool]$NoDocker
+
+if ($NoDocker) {
+  Write-Warning "-NoDocker is deprecated; use -WorkerOnly."
+}
+if ($WorkerInstall -and $NoCli) {
+  throw "Worker-only install requires the aegis CLI; remove -NoCli."
+}
 
 function Require-Command {
   param([string]$Name)
@@ -119,17 +128,13 @@ function Mint-Token {
 }
 
 function Configure-ExistingControlPlane {
+  if ([string]::IsNullOrWhiteSpace($env:AEGIS_SERVER_URL) -or [string]::IsNullOrWhiteSpace($env:AEGIS_ACCESS_TOKEN)) {
+    throw "Worker-only install requires AEGIS_SERVER_URL and AEGIS_ACCESS_TOKEN. This does not install a standalone non-Docker Aegis Server."
+  }
   Install-RootFiles
-  if ([string]::IsNullOrWhiteSpace($env:AEGIS_SERVER_URL) -and [string]::IsNullOrWhiteSpace($env:AEGIS_ACCESS_TOKEN)) {
-    return
-  }
-  if (-not [string]::IsNullOrWhiteSpace($env:AEGIS_SERVER_URL)) {
-    Set-EnvKey "AEGIS_API_URL" $env:AEGIS_SERVER_URL.TrimEnd("/")
-  }
-  if (-not [string]::IsNullOrWhiteSpace($env:AEGIS_ACCESS_TOKEN)) {
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $TokenFile) | Out-Null
-    Set-Content -Path $TokenFile -Value $env:AEGIS_ACCESS_TOKEN -NoNewline -Encoding ASCII
-  }
+  Set-EnvKey "AEGIS_API_URL" $env:AEGIS_SERVER_URL.TrimEnd("/")
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $TokenFile) | Out-Null
+  Set-Content -Path $TokenFile -Value $env:AEGIS_ACCESS_TOKEN -NoNewline -Encoding ASCII
 }
 
 function Verify-Checksum {
@@ -170,7 +175,7 @@ function Load-ImageArchive {
       Download-File "$ReleaseBase/$asset" $archive
     }
     catch {
-      throw "The GHCR image ghcr.io/haloforgeai/aegis:$AegisVersion is not anonymously pullable and $asset is not attached to the public release. Set the package visibility to Public, publish the Docker archive release asset, or run with -NoDocker to install only the local CLI for now."
+      throw "The GHCR image ghcr.io/haloforgeai/aegis:$AegisVersion is not anonymously pullable and $asset is not attached to the public release. Set the package visibility to Public, publish the Docker archive release asset, or run with -WorkerOnly to connect this machine to an existing Aegis Server."
     }
     Download-File "$ReleaseBase/SHA256SUMS" (Join-Path $tmp "SHA256SUMS")
     Verify-Checksum (Join-Path $tmp "SHA256SUMS") $asset $archive
@@ -236,16 +241,26 @@ if (-not $NoCli) {
   Install-AegisCli
 }
 
-if (-not $NoDocker) {
-  Install-AegisCompose
-} else {
+if ($WorkerInstall) {
   Configure-ExistingControlPlane
+} else {
+  Install-AegisCompose
 }
 
 Write-Host ""
-Write-Host "Aegis install path is ready."
-Write-Host "Next checks:"
-Write-Host "  $AegisBinDir\aegis.exe --root `"$AegisHome`" status"
-Write-Host "  $AegisBinDir\aegis.exe status"
-Write-Host "  $AegisBinDir\aegis.exe onboarding doctor"
-Write-Host "  $AegisBinDir\aegis.exe worker tools --no-exec"
+if ($WorkerInstall) {
+  Write-Host "Aegis worker-only install is ready."
+  Write-Host "This machine is configured to connect to:"
+  Write-Host "  $($env:AEGIS_SERVER_URL.TrimEnd('/'))"
+  Write-Host "Next checks:"
+  Write-Host "  $AegisBinDir\aegis.exe --root `"$AegisHome`" status --no-compose"
+  Write-Host "  $AegisBinDir\aegis.exe --root `"$AegisHome`" worker tools --no-exec"
+  Write-Host "  $AegisBinDir\aegis.exe --root `"$AegisHome`" local-gateway --workspace-root `"$HOME\work`" --max-workers 2"
+} else {
+  Write-Host "Aegis install path is ready."
+  Write-Host "Next checks:"
+  Write-Host "  $AegisBinDir\aegis.exe --root `"$AegisHome`" status"
+  Write-Host "  $AegisBinDir\aegis.exe status"
+  Write-Host "  $AegisBinDir\aegis.exe onboarding doctor"
+  Write-Host "  $AegisBinDir\aegis.exe worker tools --no-exec"
+}
