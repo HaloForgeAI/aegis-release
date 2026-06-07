@@ -62,7 +62,7 @@ curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/inst
 Pin a release:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.sh | AEGIS_VERSION=v0.1.1 bash
+curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.sh | AEGIS_VERSION=v0.1.2 bash
 ```
 
 Check the install:
@@ -85,7 +85,7 @@ powershell -ExecutionPolicy Bypass -File .\install-aegis.ps1
 Pin a release:
 
 ```powershell
-$env:AEGIS_VERSION = "v0.1.1"
+$env:AEGIS_VERSION = "v0.1.2"
 powershell -ExecutionPolicy Bypass -File .\install-aegis.ps1
 ```
 
@@ -198,7 +198,7 @@ mirrored into GitHub Releases in this repository.
 Maintainers can check the public gates with:
 
 ```bash
-scripts/check-public-release.sh v0.1.1
+scripts/check-public-release.sh v0.1.2
 ```
 
 The check verifies GitHub Release downloads, GHCR anonymous access or the Docker

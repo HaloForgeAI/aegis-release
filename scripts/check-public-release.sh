@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:-${AEGIS_VERSION:-v0.1.1}}"
+VERSION="${1:-${AEGIS_VERSION:-v0.1.2}}"
 REPO="${AEGIS_RELEASE_REPO:-HaloForgeAI/aegis-release}"
 DOMAIN="${AEGIS_SITE_DOMAIN:-https://aegis.haloforge.dev}"
 RELEASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"

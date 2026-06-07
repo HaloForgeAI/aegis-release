@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO="${AEGIS_RELEASE_REPO:-HaloForgeAI/aegis-release}"
 BRANCH="${AEGIS_RELEASE_BRANCH:-main}"
-VERSION="${AEGIS_VERSION:-v0.1.1}"
+VERSION="${AEGIS_VERSION:-v0.1.2}"
 AEGIS_HOME="${AEGIS_HOME:-$HOME/.aegis/self-host}"
 AEGIS_ROOT_FILE="${AEGIS_ROOT_FILE:-$HOME/.aegis/root.txt}"
 BIN_DIR="${AEGIS_BIN_DIR:-$HOME/.local/bin}"
@@ -16,7 +16,7 @@ usage() {
 Usage: install.sh [--worker-only] [--no-cli]
 
 Environment:
-  AEGIS_VERSION        Release tag to install, default v0.1.1
+  AEGIS_VERSION        Release tag to install, default v0.1.2
   AEGIS_HOME           Self-host directory, default ~/.aegis/self-host
   AEGIS_BIN_DIR        CLI install directory, default ~/.local/bin
   AEGIS_RELEASE_REPO   Release repository, default HaloForgeAI/aegis-release

@@ -65,7 +65,7 @@ services:
 
   aegis-server:
     container_name: aegis-server
-    image: ${AEGIS_IMAGE:-ghcr.io/haloforgeai/aegis:${AEGIS_VERSION:-v0.1.1}}
+    image: ${AEGIS_IMAGE:-ghcr.io/haloforgeai/aegis:${AEGIS_VERSION:-v0.1.2}}
     restart: unless-stopped
     depends_on:
       postgres:

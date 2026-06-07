@@ -1,5 +1,5 @@
 param(
-  [string]$AegisVersion = $(if ($env:AEGIS_VERSION) { $env:AEGIS_VERSION } else { "v0.1.1" }),
+  [string]$AegisVersion = $(if ($env:AEGIS_VERSION) { $env:AEGIS_VERSION } else { "v0.1.2" }),
   [string]$AegisHome = $(if ($env:AEGIS_HOME) { $env:AEGIS_HOME } else { Join-Path $HOME ".aegis\self-host" }),
   [string]$AegisRootFile = $(if ($env:AEGIS_ROOT_FILE) { $env:AEGIS_ROOT_FILE } else { Join-Path $HOME ".aegis\root.txt" }),
   [string]$AegisBinDir = $(if ($env:AEGIS_BIN_DIR) { $env:AEGIS_BIN_DIR } else { Join-Path $HOME ".aegis\bin" }),
