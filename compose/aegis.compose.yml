@@ -1,0 +1,113 @@
+name: aegis
+
+services:
+  postgres:
+    container_name: aegis-postgres
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis
+      POSTGRES_DB: aegis
+    ports:
+      - "5432:5432"
+    volumes:
+      - aegis_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis -d aegis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    container_name: aegis-redis
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    container_name: aegis-minio
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: aegis
+      MINIO_ROOT_PASSWORD: aegis-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - aegis_minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-setup:
+    container_name: aegis-minio-setup
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 aegis aegis-secret &&
+      mc mb -p local/aegis &&
+      echo 'bucket aegis ready';
+      "
+
+  aegis-server:
+    container_name: aegis-server
+    image: ${AEGIS_IMAGE:-ghcr.io/haloforgeai/aegis:${AEGIS_VERSION:-v0.1.1}}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      AEGIS_BIND_ADDR: "0.0.0.0:8787"
+      AEGIS_PG_URL: "postgres://aegis:aegis@postgres:5432/aegis"
+      AEGIS_REDIS_URL: "redis://redis:6379"
+      AEGIS_S3_ENDPOINT: "http://minio:9000"
+      AEGIS_S3_BUCKET: "aegis"
+      AEGIS_S3_ACCESS_KEY: "aegis"
+      AEGIS_S3_SECRET_KEY: "aegis-secret"
+      AEGIS_S3_REGION: "us-east-1"
+      AEGIS_LLM_BASE_URL: "${AEGIS_LLM_BASE_URL:-}"
+      AEGIS_LLM_MODEL: "${AEGIS_LLM_MODEL:-}"
+      AEGIS_LLM_API_KEY: "${AEGIS_LLM_API_KEY:-}"
+      AEGIS_CONTEXT_MAINTENANCE_ENABLED: "${AEGIS_CONTEXT_MAINTENANCE_ENABLED:-true}"
+      AEGIS_CONTEXT_MAINTENANCE_USE_LLM: "${AEGIS_CONTEXT_MAINTENANCE_USE_LLM:-false}"
+      AEGIS_GATEWAY_DISPATCH_ENABLED: "${AEGIS_GATEWAY_DISPATCH_ENABLED:-true}"
+      AEGIS_GATEWAY_HEALTH_ENABLED: "${AEGIS_GATEWAY_HEALTH_ENABLED:-true}"
+      AEGIS_AUTOMATION_SCHEDULER_ENABLED: "${AEGIS_AUTOMATION_SCHEDULER_ENABLED:-true}"
+      AEGIS_AUTOMATION_SCHEDULER_INTERVAL_SECS: "${AEGIS_AUTOMATION_SCHEDULER_INTERVAL_SECS:-60}"
+      AEGIS_TELEGRAM_BOT_TOKEN: "${AEGIS_TELEGRAM_BOT_TOKEN:-}"
+      AEGIS_TELEGRAM_TENANT: "${AEGIS_TELEGRAM_TENANT:-}"
+      AEGIS_TELEGRAM_MODE: "${AEGIS_TELEGRAM_MODE:-}"
+      AEGIS_TELEGRAM_SECRET_TOKEN: "${AEGIS_TELEGRAM_SECRET_TOKEN:-}"
+      AEGIS_AUTH_SECRET: "${AEGIS_AUTH_SECRET:?set AEGIS_AUTH_SECRET in .env}"
+    ports:
+      - "8787:8787"
+
+volumes:
+  aegis_pg:
+    name: aegis-postgres-data
+  aegis_minio:
+    name: aegis-minio-data
+
+networks:
+  default:
+    name: aegis-network

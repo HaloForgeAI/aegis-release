@@ -1,0 +1,31 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: validate public release files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash syntax
+        run: bash -n install.sh
+      - name: PowerShell syntax
+        shell: pwsh
+        run: |
+          $null = [scriptblock]::Create((Get-Content -Raw install.ps1))
+      - name: Public compose shape
+        run: |
+          grep -q 'ghcr.io/haloforgeai/aegis' compose/aegis.compose.yml
+          grep -q 'AEGIS_AUTH_SECRET' compose/aegis.compose.yml
+          grep -q 'HaloForgeAI/Aegis' README.md
