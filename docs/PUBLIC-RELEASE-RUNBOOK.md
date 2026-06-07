@@ -4,14 +4,24 @@
 
 Make Aegis installable by users who cannot access the private source repository.
 
-The public release is complete only when all of these work anonymously:
+The public release is complete when users can install without access to the
+private source repository. These checks must work anonymously:
 
 ```bash
-docker pull ghcr.io/haloforgeai/aegis:<tag>
 curl -I https://github.com/HaloForgeAI/aegis-release/releases/download/<tag>/aegis-server-<tag>-linux-amd64.docker.tar.gz
 curl -I https://github.com/HaloForgeAI/aegis-release/releases/download/<tag>/SHA256SUMS
 curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.sh | AEGIS_VERSION=<tag> bash
 ```
+
+GHCR anonymous pull is preferred, but it is not the only public path while the
+source repository remains private:
+
+```bash
+docker pull ghcr.io/haloforgeai/aegis:<tag>
+```
+
+If that asks for credentials, the public Docker archive fallback above must be
+present and checksum-verified.
 
 ## Source Release
 
@@ -27,9 +37,10 @@ curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/inst
 
 ## Public Mirror
 
-The private workflow should upload the CLI archives and checksums to this
-repository's GitHub Release with the same tag. That workflow needs a secret with
-contents write permission to `HaloForgeAI/aegis-release`, for example:
+The private workflow should upload the CLI archives, `SHA256SUMS`, and Docker
+archive fallback to this repository's GitHub Release with the same tag. That
+workflow needs a secret with contents write permission to
+`HaloForgeAI/aegis-release`, for example:
 
 ```text
 AEGIS_PUBLIC_RELEASE_TOKEN
@@ -108,5 +119,7 @@ curl -I https://aegis.haloforge.dev
 
 ## Website Update
 
-Only after the anonymous checks pass should `HaloForgeAI/aegis-site` promote the
-quickstart from "launch target" to "available".
+Only after the anonymous release asset checks and installer smoke pass should
+`HaloForgeAI/aegis-site` promote the quickstart from "launch target" to
+"available". If GHCR is still private, the site must say that full self-host uses
+the Docker archive fallback.
