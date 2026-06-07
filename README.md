@@ -167,6 +167,13 @@ Windows:
 ```
 
 `--purge` / `-Purge` removes Docker volumes, including local database data.
+If the helper script was not downloaded, use the CLI lifecycle commands instead:
+
+```bash
+aegis --root ~/.aegis/self-host stop
+aegis --root ~/.aegis/self-host down
+aegis --root ~/.aegis/self-host down --purge
+```
 
 ## Repository Roles
 

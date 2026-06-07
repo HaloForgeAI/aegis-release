@@ -42,7 +42,13 @@ function Ensure-RootScaffold {
 function Install-RootFiles {
   Ensure-RootScaffold
   Download-File "$RawBase/compose/aegis.compose.yml" (Join-Path $AegisHome "docker\docker-compose.yml")
-  Download-File "$RawBase/scripts/aegis-stop.ps1" (Join-Path $AegisHome "scripts\aegis-stop.ps1")
+  try {
+    Download-File "$RawBase/scripts/aegis-stop.ps1" (Join-Path $AegisHome "scripts\aegis-stop.ps1")
+  }
+  catch {
+    Remove-Item (Join-Path $AegisHome "scripts\aegis-stop.ps1") -Force -ErrorAction SilentlyContinue
+    Write-Warning "Could not download optional scripts/aegis-stop.ps1 helper."
+  }
 }
 
 function Set-EnvKey {

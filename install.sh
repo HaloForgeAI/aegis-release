@@ -143,8 +143,12 @@ EOF
 install_root_files() {
   ensure_root_scaffold
   download "${BASE_RAW_URL}/compose/aegis.compose.yml" "$AEGIS_HOME/docker/docker-compose.yml"
-  download "${BASE_RAW_URL}/scripts/aegis-stop.sh" "$AEGIS_HOME/scripts/aegis-stop.sh"
-  chmod +x "$AEGIS_HOME/scripts/aegis-stop.sh"
+  if download "${BASE_RAW_URL}/scripts/aegis-stop.sh" "$AEGIS_HOME/scripts/aegis-stop.sh"; then
+    chmod +x "$AEGIS_HOME/scripts/aegis-stop.sh"
+  else
+    rm -f "$AEGIS_HOME/scripts/aegis-stop.sh"
+    echo "Warning: could not download optional scripts/aegis-stop.sh helper." >&2
+  fi
 }
 
 write_env_key() {
