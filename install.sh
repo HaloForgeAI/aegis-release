@@ -1,58 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="${AEGIS_RELEASE_REPO:-HaloForgeAI/aegis-release}"
-BRANCH="${AEGIS_RELEASE_BRANCH:-main}"
 VERSION="${AEGIS_VERSION:-v0.1.2}"
 AEGIS_HOME="${AEGIS_HOME:-$HOME/.aegis/self-host}"
-AEGIS_ROOT_FILE="${AEGIS_ROOT_FILE:-$HOME/.aegis/root.txt}"
-BIN_DIR="${AEGIS_BIN_DIR:-$HOME/.local/bin}"
-BASE_RAW_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
-RELEASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
-TOKEN_FILE="${AEGIS_TOKEN_FILE:-$AEGIS_HOME/.aegis/access-token.txt}"
+BIN_DIR="${AEGIS_BIN_DIR:-$HOME/.aegis/bin}"
+STATE_DIR="$AEGIS_HOME/.aegis"
+TOKEN_FILE="$STATE_DIR/access-token.txt"
+ROOT_FILE="${AEGIS_ROOT_FILE:-$HOME/.aegis/root.txt}"
+WORKER_ONLY=false
+START_LOCAL_GATEWAY=true
 
 usage() {
-  cat <<'USAGE'
-Usage: install.sh [--worker-only] [--no-cli]
+  cat <<'EOF'
+Usage: install.sh [options]
 
-Environment:
-  AEGIS_VERSION        Release tag to install, default v0.1.2
-  AEGIS_HOME           Self-host directory, default ~/.aegis/self-host
-  AEGIS_BIN_DIR        CLI install directory, default ~/.local/bin
-  AEGIS_RELEASE_REPO   Release repository, default HaloForgeAI/aegis-release
-  AEGIS_ACCESS_TOKEN   Existing owner token for worker-only installs
-  AEGIS_SERVER_URL     Existing Aegis Server API URL for worker-only installs
-USAGE
+Options:
+  --worker-only            Connect this machine to an existing Aegis Server.
+  --no-start-local-gateway Install/configure but leave Local Gateway stopped.
+  -h, --help               Show help.
+EOF
 }
 
-WORKER_ONLY=0
-NO_CLI=0
-
-while [[ $# -gt 0 ]]; do
+while [ "$#" -gt 0 ]; do
   case "$1" in
     --worker-only)
-      WORKER_ONLY=1
-      shift
+      WORKER_ONLY=true
       ;;
-    --no-docker)
-      echo "Warning: --no-docker is deprecated; use --worker-only." >&2
-      WORKER_ONLY=1
-      shift
-      ;;
-    --no-cli)
-      NO_CLI=1
-      shift
+    --no-start-local-gateway)
+      START_LOCAL_GATEWAY=false
       ;;
     -h|--help)
       usage
       exit 0
       ;;
     *)
-      echo "Unknown argument: $1" >&2
+      echo "Unknown option: $1" >&2
       usage >&2
       exit 2
       ;;
   esac
+  shift
 done
 
 need() {
@@ -62,278 +49,133 @@ need() {
   fi
 }
 
-download() {
-  local url="$1"
-  local output="$2"
-  curl -fsSL "$url" -o "$output"
+target_triple() {
+  local os arch
+  os="$(uname -s)"
+  arch="$(uname -m)"
+  case "$os:$arch" in
+    Darwin:arm64) echo "aarch64-apple-darwin" ;;
+    Linux:x86_64) echo "x86_64-unknown-linux-gnu" ;;
+    *)
+      echo "Unsupported platform: $os $arch" >&2
+      exit 1
+      ;;
+  esac
 }
 
-verify_checksum() {
-  local sums="$1"
-  local asset="$2"
-  local dir="$3"
-  local expected actual
-
-  expected="$(awk -v asset="$asset" '$2 == asset { print $1 }' "$sums")"
-  if [[ -z "$expected" ]]; then
-    echo "Checksum for ${asset} was not found in SHA256SUMS." >&2
-    exit 1
-  fi
-
-  if command -v sha256sum >/dev/null 2>&1; then
-    actual="$(sha256sum "${dir}/${asset}" | awk '{ print $1 }')"
-  else
-    actual="$(shasum -a 256 "${dir}/${asset}" | awk '{ print $1 }')"
-  fi
-
-  if [[ "$actual" != "$expected" ]]; then
-    echo "Checksum mismatch for ${asset}." >&2
-    echo "Expected: ${expected}" >&2
-    echo "Actual:   ${actual}" >&2
-    exit 1
-  fi
+random_hex() {
+  python3 - "$1" <<'PY'
+import secrets, sys
+print(secrets.token_hex(int(sys.argv[1])))
+PY
 }
 
-ensure_public_image_available() {
-  local image_scope token_response token code
-  image_scope="repository:haloforgeai/aegis:pull"
-  token_response="$(curl -fsSL "https://ghcr.io/token?service=ghcr.io&scope=${image_scope}" 2>/dev/null || true)"
-  token="$(printf '%s' "$token_response" | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-  if [[ -z "$token" ]]; then
-    load_image_archive
-    return
-  fi
-
-  code="$(curl -LsS -o /dev/null -w '%{http_code}' \
-    -H "Authorization: Bearer ${token}" \
-    -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json' \
-    "https://ghcr.io/v2/haloforgeai/aegis/manifests/${VERSION}" 2>/dev/null || true)"
-  if [[ "$code" != "200" ]]; then
-    load_image_archive
-  fi
-}
-
-load_image_archive() {
-  local asset tmp
-  asset="aegis-server-${VERSION}-linux-amd64.docker.tar.gz"
-  tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' RETURN
-
-  echo "Public GHCR image was not reachable; downloading recovery archive ${asset}..."
-  if ! download "${RELEASE_URL}/${asset}" "${tmp}/${asset}"; then
-    cat >&2 <<EOF
-The official GHCR image was not reachable and the Docker recovery archive was not found:
-  ${RELEASE_URL}/${asset}
-
-Confirm ghcr.io/haloforgeai/aegis:${VERSION} is public and published, publish the
-Docker recovery archive release asset, or run with --worker-only to connect this
-machine to an existing Aegis Server.
-EOF
-    exit 1
-  fi
-  download "${RELEASE_URL}/SHA256SUMS" "${tmp}/SHA256SUMS"
-  verify_checksum "${tmp}/SHA256SUMS" "$asset" "$tmp"
-  docker load --input "${tmp}/${asset}"
-}
-
-secret_hex() {
-  if command -v openssl >/dev/null 2>&1; then
-    openssl rand -hex 32
-  else
-    date +%s | shasum -a 256 | awk '{print $1}'
-  fi
-}
-
-ensure_root_scaffold() {
-  mkdir -p "$AEGIS_HOME/docker" "$AEGIS_HOME/scripts" "$AEGIS_HOME/.aegis" "$(dirname "$AEGIS_ROOT_FILE")"
-  printf '%s\n' "$AEGIS_HOME" > "$AEGIS_ROOT_FILE"
-  if [[ ! -f "$AEGIS_HOME/Cargo.toml" ]]; then
-    cat > "$AEGIS_HOME/Cargo.toml" <<'EOF'
-[workspace]
-# Public Aegis install root marker.
-EOF
-  fi
-}
-
-install_root_files() {
-  ensure_root_scaffold
-  download "${BASE_RAW_URL}/compose/aegis.compose.yml" "$AEGIS_HOME/docker/docker-compose.yml"
-  if download "${BASE_RAW_URL}/scripts/aegis-stop.sh" "$AEGIS_HOME/scripts/aegis-stop.sh"; then
-    chmod +x "$AEGIS_HOME/scripts/aegis-stop.sh"
-  else
-    rm -f "$AEGIS_HOME/scripts/aegis-stop.sh"
-    echo "Warning: could not download optional scripts/aegis-stop.sh helper." >&2
-  fi
-}
-
-write_env_key() {
-  local key="$1"
-  local value="$2"
-  local escaped
-  escaped="${value//\\/\\\\}"
-  escaped="${escaped//\"/\\\"}"
-  escaped="${escaped//\$/\\$}"
-  escaped="${escaped//\`/\\\`}"
-  if [[ ! -f "$AEGIS_HOME/.env" ]]; then
-    touch "$AEGIS_HOME/.env"
-  fi
-  if grep -qE "^${key}=" "$AEGIS_HOME/.env"; then
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-      sed -i '' "s|^${key}=.*|${key}=\"${escaped}\"|" "$AEGIS_HOME/.env"
-    else
-      sed -i "s|^${key}=.*|${key}=\"${escaped}\"|" "$AEGIS_HOME/.env"
-    fi
-  else
-    printf '%s="%s"\n' "$key" "$escaped" >> "$AEGIS_HOME/.env"
-  fi
+quote_env() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//\$/\\\$}"
+  value="${value//\`/\\\`}"
+  printf '"%s"' "$value"
 }
 
 mint_token() {
-  local secret tenant
-  if ! command -v openssl >/dev/null 2>&1; then
-    echo "Cannot mint owner token: openssl is required." >&2
-    exit 1
-  fi
-  secret="$(awk -F= '$1 == "AEGIS_AUTH_SECRET" { gsub(/^\"|\"$/, "", $2); print $2 }' "$AEGIS_HOME/.env" | tail -n 1)"
-  tenant="$(awk -F= '$1 == "AEGIS_BOOTSTRAP_TENANT" { gsub(/^\"|\"$/, "", $2); print $2 }' "$AEGIS_HOME/.env" | tail -n 1)"
-  tenant="${tenant:-studio-a}"
-  if [[ -z "$secret" ]]; then
-    echo "Cannot mint owner token: AEGIS_AUTH_SECRET is missing." >&2
-    exit 1
-  fi
-  mkdir -p "$(dirname "$TOKEN_FILE")"
-  local exp header payload signing_input signature
-  exp="$(($(date +%s) + 30 * 24 * 3600))"
-  header='{"alg":"HS256","typ":"JWT"}'
-  payload='{"sub":"bootstrap-owner","tid":"'"$tenant"'","role":"owner","typ":"access","exp":'"$exp"'}'
-  signing_input="$(printf '%s' "$header" | openssl base64 -A | tr '+/' '-_' | tr -d '=').$(printf '%s' "$payload" | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
-  signature="$(printf '%s' "$signing_input" | openssl dgst -sha256 -hmac "$secret" -binary | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
-  printf '%s.%s\n' "$signing_input" "$signature" > "$TOKEN_FILE"
+  mkdir -p "$STATE_DIR"
+  python3 - "$AEGIS_AUTH_SECRET" "${AEGIS_BOOTSTRAP_TENANT:-studio-a}" >"$TOKEN_FILE" <<'PY'
+import base64, hashlib, hmac, json, sys, time
+secret, tenant = sys.argv[1], sys.argv[2]
+def b64(data): return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+header = {"alg": "HS256", "typ": "JWT"}
+payload = {"sub":"bootstrap-owner","tid":tenant,"role":"owner","typ":"access","exp":int(time.time()) + 30 * 24 * 3600}
+signing_input = ".".join([b64(json.dumps(header, separators=(",", ":")).encode()), b64(json.dumps(payload, separators=(",", ":")).encode())])
+sig = hmac.new(secret.encode(), signing_input.encode(), hashlib.sha256).digest()
+print(signing_input + "." + b64(sig))
+PY
   chmod 600 "$TOKEN_FILE"
 }
 
-configure_worker_only() {
-  if [[ -z "${AEGIS_SERVER_URL:-}" || -z "${AEGIS_ACCESS_TOKEN:-}" ]]; then
-    cat >&2 <<'EOF'
-Worker-only install requires both:
-  AEGIS_SERVER_URL     Existing Aegis Server URL
-  AEGIS_ACCESS_TOKEN   Owner token for that server
+download_bundle() {
+  local target asset url tmp
+  target="$(target_triple)"
+  asset="aegis-native-${VERSION}-${target}.tar.gz"
+  url="https://github.com/HaloForgeAI/aegis-release/releases/download/${VERSION}/${asset}"
+  tmp="$(mktemp -d)"
+  echo "Downloading $asset ..."
+  curl -fsSL "$url" -o "$tmp/$asset"
+  tar -xzf "$tmp/$asset" -C "$tmp"
+  mkdir -p "$BIN_DIR" "$AEGIS_HOME/scripts"
+  cp "$tmp/aegis-native-${VERSION}-${target}/aegis" "$BIN_DIR/aegis"
+  cp "$tmp/aegis-native-${VERSION}-${target}/aegis-server" "$BIN_DIR/aegis-server"
+  cp "$tmp/aegis-native-${VERSION}-${target}/aegis-install.sh" "$AEGIS_HOME/scripts/aegis-install.sh" 2>/dev/null || true
+  cp "$tmp/aegis-native-${VERSION}-${target}/aegis-stop.sh" "$AEGIS_HOME/scripts/aegis-stop.sh" 2>/dev/null || true
+  chmod +x "$BIN_DIR/aegis" "$BIN_DIR/aegis-server"
+  chmod +x "$AEGIS_HOME/scripts/"*.sh 2>/dev/null || true
+}
 
-This does not install a standalone non-Docker Aegis Server.
+write_env() {
+  mkdir -p "$AEGIS_HOME" "$STATE_DIR"
+  if [ "$WORKER_ONLY" = true ]; then
+    : "${AEGIS_SERVER_URL:?AEGIS_SERVER_URL is required for --worker-only}"
+    : "${AEGIS_ACCESS_TOKEN:?AEGIS_ACCESS_TOKEN is required for --worker-only}"
+    cat >"$AEGIS_HOME/.env" <<EOF
+AEGIS_API_URL=$(quote_env "$AEGIS_SERVER_URL")
+AEGIS_PUBLIC_URL=$(quote_env "$AEGIS_SERVER_URL")
 EOF
-    exit 1
+    printf '%s\n' "$AEGIS_ACCESS_TOKEN" >"$TOKEN_FILE"
+    chmod 600 "$TOKEN_FILE"
+    return
   fi
-  install_root_files
-  write_env_key AEGIS_API_URL "${AEGIS_SERVER_URL%/}"
-  mkdir -p "$(dirname "$TOKEN_FILE")"
-  printf '%s\n' "$AEGIS_ACCESS_TOKEN" > "$TOKEN_FILE"
-  chmod 600 "$TOKEN_FILE"
+
+  AEGIS_AUTH_SECRET="${AEGIS_AUTH_SECRET:-$(random_hex 32)}"
+  AEGIS_BOOTSTRAP_TENANT="${AEGIS_BOOTSTRAP_TENANT:-studio-a}"
+  cat >"$AEGIS_HOME/.env" <<EOF
+AEGIS_AUTH_SECRET=$(quote_env "$AEGIS_AUTH_SECRET")
+AEGIS_BOOTSTRAP_TENANT=$(quote_env "$AEGIS_BOOTSTRAP_TENANT")
+AEGIS_API_URL="http://localhost:8787"
+AEGIS_PUBLIC_URL=$(quote_env "${AEGIS_PUBLIC_URL:-http://localhost:8788}")
+AEGIS_WEB_PORT=$(quote_env "${AEGIS_WEB_PORT:-8788}")
+AEGIS_SQLITE_PATH=$(quote_env "$STATE_DIR/aegis.sqlite")
+AEGIS_ATTACHMENTS_DIR=$(quote_env "$STATE_DIR/attachments")
+
+AEGIS_LLM_BASE_URL=$(quote_env "${AEGIS_LLM_BASE_URL:-}")
+AEGIS_LLM_MODEL=$(quote_env "${AEGIS_LLM_MODEL:-}")
+AEGIS_LLM_API_KEY=$(quote_env "${AEGIS_LLM_API_KEY:-}")
+
+AEGIS_CONTEXT_MAINTENANCE_ENABLED=true
+AEGIS_CONTEXT_MAINTENANCE_USE_LLM=false
+AEGIS_GATEWAY_DISPATCH_ENABLED=true
+AEGIS_GATEWAY_HEALTH_ENABLED=true
+AEGIS_AUTOMATION_SCHEDULER_ENABLED=true
+
+AEGIS_TELEGRAM_BOT_TOKEN=$(quote_env "${AEGIS_TELEGRAM_BOT_TOKEN:-}")
+AEGIS_TELEGRAM_TENANT=$(quote_env "$AEGIS_BOOTSTRAP_TENANT")
+AEGIS_TELEGRAM_MODE=$(quote_env "${AEGIS_TELEGRAM_MODE:-polling}")
+AEGIS_TELEGRAM_SECRET_TOKEN=$(quote_env "${AEGIS_TELEGRAM_SECRET_TOKEN:-$(random_hex 16)}")
+EOF
+  mint_token
 }
 
-install_cli() {
+main() {
   need curl
   need tar
+  need python3
+  download_bundle
+  write_env
+  mkdir -p "$(dirname "$ROOT_FILE")"
+  printf '%s\n' "$AEGIS_HOME" >"$ROOT_FILE"
+  export PATH="$BIN_DIR:$PATH"
 
-  local os arch target asset tmp
-  os="$(uname -s)"
-  arch="$(uname -m)"
-
-  if [[ "$os" == "Darwin" && "$arch" == "arm64" ]]; then
-    target="aarch64-apple-darwin"
+  if [ "$WORKER_ONLY" = true ]; then
+    echo "Worker-only install is ready."
+    echo "Start Local Gateway with: $BIN_DIR/aegis --root $AEGIS_HOME local-gateway --workspace-root <path>"
+  elif [ "$START_LOCAL_GATEWAY" = true ]; then
+    "$BIN_DIR/aegis" --root "$AEGIS_HOME" start
   else
-    echo "This public installer currently supports macOS Apple Silicon for CLI install." >&2
-    echo "Use install.ps1 on Windows or set --no-cli and install the CLI manually." >&2
-    exit 1
+    "$BIN_DIR/aegis" --root "$AEGIS_HOME" start --no-local-gateway
   fi
 
-  asset="aegis-cli-${VERSION}-${target}.tar.gz"
-  tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' RETURN
-
-  echo "Downloading ${asset}..."
-  download "${RELEASE_URL}/${asset}" "${tmp}/${asset}"
-  download "${RELEASE_URL}/SHA256SUMS" "${tmp}/SHA256SUMS"
-  verify_checksum "${tmp}/SHA256SUMS" "$asset" "$tmp"
-  mkdir -p "$BIN_DIR"
-  tar -xzf "${tmp}/${asset}" -C "$tmp"
-  install -m 0755 "${tmp}/aegis-cli-${VERSION}-${target}/aegis" "${BIN_DIR}/aegis"
-  echo "Installed aegis CLI to ${BIN_DIR}/aegis"
+  echo "Aegis installed at $AEGIS_HOME"
+  echo "CLI: $BIN_DIR/aegis"
 }
 
-install_compose() {
-  need curl
-  need docker
-  need openssl
-  install_root_files
-  ensure_public_image_available
-
-  mkdir -p "$AEGIS_HOME"
-  cd "$AEGIS_HOME"
-
-  if [[ ! -f .env ]]; then
-    download "${BASE_RAW_URL}/.env.example" ".env"
-    auth_secret="$(secret_hex)"
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-      sed -i '' "s/^AEGIS_AUTH_SECRET=.*/AEGIS_AUTH_SECRET=${auth_secret}/" .env
-    else
-      sed -i "s/^AEGIS_AUTH_SECRET=.*/AEGIS_AUTH_SECRET=${auth_secret}/" .env
-    fi
-  fi
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    sed -i '' "s/^AEGIS_VERSION=.*/AEGIS_VERSION=${VERSION}/" .env
-    sed -i '' "s|^AEGIS_IMAGE=.*|AEGIS_IMAGE=ghcr.io/haloforgeai/aegis:${VERSION}|" .env
-  else
-    sed -i "s/^AEGIS_VERSION=.*/AEGIS_VERSION=${VERSION}/" .env
-    sed -i "s|^AEGIS_IMAGE=.*|AEGIS_IMAGE=ghcr.io/haloforgeai/aegis:${VERSION}|" .env
-  fi
-  write_env_key AEGIS_API_URL "${AEGIS_API_URL:-http://localhost:8787}"
-  write_env_key AEGIS_BOOTSTRAP_TENANT "${AEGIS_BOOTSTRAP_TENANT:-studio-a}"
-  mint_token
-
-  docker compose -p aegis --env-file .env -f docker/docker-compose.yml up -d
-}
-
-if [[ "$WORKER_ONLY" -eq 1 && "$NO_CLI" -eq 1 ]]; then
-  echo "Worker-only install requires the aegis CLI; remove --no-cli." >&2
-  exit 1
-fi
-
-if [[ "$NO_CLI" -eq 0 ]]; then
-  install_cli
-fi
-
-if [[ "$WORKER_ONLY" -eq 1 ]]; then
-  configure_worker_only
-else
-  install_compose
-fi
-
-if [[ "$WORKER_ONLY" -eq 1 ]]; then
-  cat <<EOF
-
-Aegis worker-only install is ready.
-
-This machine is configured to connect to:
-  ${AEGIS_SERVER_URL%/}
-
-Next checks:
-  ${BIN_DIR}/aegis --root ${AEGIS_HOME} status --no-compose
-  ${BIN_DIR}/aegis --root ${AEGIS_HOME} worker tools --no-exec
-  ${BIN_DIR}/aegis --root ${AEGIS_HOME} local-gateway --workspace-root "\$HOME/work" --max-workers 2
-
-If ${BIN_DIR} is not on PATH, add it to your shell profile.
-EOF
-else
-  cat <<EOF
-
-Aegis install path is ready.
-
-Next checks:
-  ${BIN_DIR}/aegis --root ${AEGIS_HOME} status
-  ${BIN_DIR}/aegis status
-  ${BIN_DIR}/aegis onboarding doctor
-  ${BIN_DIR}/aegis worker tools --no-exec
-
-If ${BIN_DIR} is not on PATH, add it to your shell profile.
-EOF
-fi
+main
