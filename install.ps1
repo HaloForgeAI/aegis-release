@@ -49,11 +49,11 @@ function Mint-Token {
     $secret = New-RandomHex 32
     $env:AEGIS_AUTH_SECRET = $secret
   }
-  $tenant = if ($env:AEGIS_BOOTSTRAP_TENANT) { $env:AEGIS_BOOTSTRAP_TENANT } else { "studio-a" }
+  $ownerId = if ($env:AEGIS_OWNER_ID) { $env:AEGIS_OWNER_ID } else { "owner" }
   $headerJson = '{"alg":"HS256","typ":"JWT"}'
   $payload = [ordered]@{
     sub = "bootstrap-owner"
-    tid = $tenant
+    tid = $ownerId
     role = "owner"
     typ = "access"
     exp = [int64]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + 30 * 24 * 3600)
@@ -104,10 +104,10 @@ function Write-Env {
   }
 
   if ([string]::IsNullOrWhiteSpace($env:AEGIS_AUTH_SECRET)) { $env:AEGIS_AUTH_SECRET = New-RandomHex 32 }
-  $tenant = if ($env:AEGIS_BOOTSTRAP_TENANT) { $env:AEGIS_BOOTSTRAP_TENANT } else { "studio-a" }
+  $ownerId = if ($env:AEGIS_OWNER_ID) { $env:AEGIS_OWNER_ID } else { "owner" }
   Set-Content -Path (Join-Path $AegisHome ".env") -Value @(
     "AEGIS_AUTH_SECRET=$(Quote-Env $env:AEGIS_AUTH_SECRET)",
-    "AEGIS_BOOTSTRAP_TENANT=$(Quote-Env $tenant)",
+    "AEGIS_OWNER_ID=$(Quote-Env $ownerId)",
     "AEGIS_PROFILE=$(Quote-Env $AegisProfile)",
     "AEGIS_API_URL=`"http://localhost:8787`"",
     "AEGIS_PUBLIC_URL=$(Quote-Env $(if ($env:AEGIS_PUBLIC_URL) { $env:AEGIS_PUBLIC_URL } else { "http://localhost:8788" }))",
@@ -130,7 +130,7 @@ function Write-Env {
     "AEGIS_AUTOMATION_SCHEDULER_ENABLED=true",
     "",
     "AEGIS_TELEGRAM_BOT_TOKEN=$(Quote-Env $env:AEGIS_TELEGRAM_BOT_TOKEN)",
-    "AEGIS_TELEGRAM_TENANT=$(Quote-Env $tenant)",
+    "AEGIS_TELEGRAM_OWNER_ID=$(Quote-Env $ownerId)",
     "AEGIS_TELEGRAM_MODE=$(Quote-Env $(if ($env:AEGIS_TELEGRAM_MODE) { $env:AEGIS_TELEGRAM_MODE } else { "polling" }))",
     "AEGIS_TELEGRAM_SECRET_TOKEN=$(Quote-Env $(if ($env:AEGIS_TELEGRAM_SECRET_TOKEN) { $env:AEGIS_TELEGRAM_SECRET_TOKEN } else { New-RandomHex 16 }))"
   ) -Encoding ASCII

@@ -21,7 +21,7 @@ usage() {
 Usage: install.sh [options]
 
 Options:
-  --worker-only            Connect this machine to an existing Aegis Server.
+  --worker-only            Connect this machine to an existing Aegis Core.
   --no-start-local-gateway Install/configure but leave Local Gateway stopped.
   -h, --help               Show help.
 EOF
@@ -87,12 +87,12 @@ quote_env() {
 
 mint_token() {
   mkdir -p "$STATE_DIR"
-  python3 - "$AEGIS_AUTH_SECRET" "${AEGIS_BOOTSTRAP_TENANT:-studio-a}" >"$TOKEN_FILE" <<'PY'
+  python3 - "$AEGIS_AUTH_SECRET" "${AEGIS_OWNER_ID:-owner}" >"$TOKEN_FILE" <<'PY'
 import base64, hashlib, hmac, json, sys, time
-secret, tenant = sys.argv[1], sys.argv[2]
+secret, owner_id = sys.argv[1], sys.argv[2]
 def b64(data): return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 header = {"alg": "HS256", "typ": "JWT"}
-payload = {"sub":"bootstrap-owner","tid":tenant,"role":"owner","typ":"access","exp":int(time.time()) + 30 * 24 * 3600}
+payload = {"sub":"bootstrap-owner","tid":owner_id,"role":"owner","typ":"access","exp":int(time.time()) + 30 * 24 * 3600}
 signing_input = ".".join([b64(json.dumps(header, separators=(",", ":")).encode()), b64(json.dumps(payload, separators=(",", ":")).encode())])
 sig = hmac.new(secret.encode(), signing_input.encode(), hashlib.sha256).digest()
 print(signing_input + "." + b64(sig))
@@ -138,10 +138,10 @@ EOF
   fi
 
   AEGIS_AUTH_SECRET="${AEGIS_AUTH_SECRET:-$(random_hex 32)}"
-  AEGIS_BOOTSTRAP_TENANT="${AEGIS_BOOTSTRAP_TENANT:-studio-a}"
+  AEGIS_OWNER_ID="${AEGIS_OWNER_ID:-owner}"
   cat >"$AEGIS_HOME/.env" <<EOF
 AEGIS_AUTH_SECRET=$(quote_env "$AEGIS_AUTH_SECRET")
-AEGIS_BOOTSTRAP_TENANT=$(quote_env "$AEGIS_BOOTSTRAP_TENANT")
+AEGIS_OWNER_ID=$(quote_env "$AEGIS_OWNER_ID")
 AEGIS_PROFILE=$(quote_env "$AEGIS_PROFILE")
 AEGIS_API_URL="http://localhost:8787"
 AEGIS_PUBLIC_URL=$(quote_env "${AEGIS_PUBLIC_URL:-http://localhost:8788}")
@@ -164,7 +164,7 @@ AEGIS_GATEWAY_HEALTH_ENABLED=true
 AEGIS_AUTOMATION_SCHEDULER_ENABLED=true
 
 AEGIS_TELEGRAM_BOT_TOKEN=$(quote_env "${AEGIS_TELEGRAM_BOT_TOKEN:-}")
-AEGIS_TELEGRAM_TENANT=$(quote_env "$AEGIS_BOOTSTRAP_TENANT")
+AEGIS_TELEGRAM_OWNER_ID=$(quote_env "$AEGIS_OWNER_ID")
 AEGIS_TELEGRAM_MODE=$(quote_env "${AEGIS_TELEGRAM_MODE:-polling}")
 AEGIS_TELEGRAM_SECRET_TOKEN=$(quote_env "${AEGIS_TELEGRAM_SECRET_TOKEN:-$(random_hex 16)}")
 EOF
