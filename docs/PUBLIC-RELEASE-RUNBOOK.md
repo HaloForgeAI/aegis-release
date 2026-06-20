@@ -21,8 +21,8 @@ Then smoke install on clean machines:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.sh | AEGIS_VERSION=<tag> bash
-aegis --root ~/.aegis/self-host status
-aegis --root ~/.aegis/self-host onboarding doctor
+aegis --root ~/.aegis/profiles/release status
+aegis --root ~/.aegis/profiles/release onboarding doctor
 ```
 
 Windows:
@@ -31,7 +31,7 @@ Windows:
 $env:AEGIS_VERSION = "<tag>"
 iwr https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/install.ps1 -OutFile install-aegis.ps1
 powershell -ExecutionPolicy Bypass -File .\install-aegis.ps1
-& "$HOME\.aegis\bin\aegis.exe" --root "$HOME\.aegis\self-host" status
+& "$HOME\.aegis\bin\aegis.exe" --root "$HOME\.aegis\profiles\release" status
 ```
 
 ## Release Notes

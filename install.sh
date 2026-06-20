@@ -2,11 +2,17 @@
 set -euo pipefail
 
 VERSION="${AEGIS_VERSION:-v0.1.2}"
-AEGIS_HOME="${AEGIS_HOME:-$HOME/.aegis/self-host}"
+AEGIS_PROFILE="${AEGIS_PROFILE:-release}"
+AEGIS_HOME="${AEGIS_HOME:-$HOME/.aegis/profiles/$AEGIS_PROFILE}"
 BIN_DIR="${AEGIS_BIN_DIR:-$HOME/.aegis/bin}"
-STATE_DIR="$AEGIS_HOME/.aegis"
+STATE_DIR="${AEGIS_RUNTIME_DIR:-$AEGIS_HOME/.aegis}"
+RUN_DIR="${AEGIS_RUN_DIR:-$STATE_DIR/run}"
+LOG_DIR="${AEGIS_LOG_DIR:-$STATE_DIR/logs}"
+EVIDENCE_DIR="${AEGIS_EVIDENCE_DIR:-$STATE_DIR/evidence}"
+DB_DIR="$STATE_DIR/db"
 TOKEN_FILE="$STATE_DIR/access-token.txt"
 ROOT_FILE="${AEGIS_ROOT_FILE:-$HOME/.aegis/root.txt}"
+PROFILE_ROOT_FILE="${AEGIS_PROFILE_ROOT_FILE:-$HOME/.aegis/roots/$AEGIS_PROFILE.txt}"
 WORKER_ONLY=false
 START_LOCAL_GATEWAY=true
 
@@ -113,13 +119,18 @@ download_bundle() {
 }
 
 write_env() {
-  mkdir -p "$AEGIS_HOME" "$STATE_DIR"
+  mkdir -p "$AEGIS_HOME" "$STATE_DIR" "$RUN_DIR" "$LOG_DIR" "$EVIDENCE_DIR" "$DB_DIR"
   if [ "$WORKER_ONLY" = true ]; then
     : "${AEGIS_SERVER_URL:?AEGIS_SERVER_URL is required for --worker-only}"
     : "${AEGIS_ACCESS_TOKEN:?AEGIS_ACCESS_TOKEN is required for --worker-only}"
     cat >"$AEGIS_HOME/.env" <<EOF
+AEGIS_PROFILE=$(quote_env "$AEGIS_PROFILE")
 AEGIS_API_URL=$(quote_env "$AEGIS_SERVER_URL")
 AEGIS_PUBLIC_URL=$(quote_env "$AEGIS_SERVER_URL")
+AEGIS_RUNTIME_DIR=$(quote_env "$STATE_DIR")
+AEGIS_RUN_DIR=$(quote_env "$RUN_DIR")
+AEGIS_LOG_DIR=$(quote_env "$LOG_DIR")
+AEGIS_EVIDENCE_DIR=$(quote_env "$EVIDENCE_DIR")
 EOF
     printf '%s\n' "$AEGIS_ACCESS_TOKEN" >"$TOKEN_FILE"
     chmod 600 "$TOKEN_FILE"
@@ -131,10 +142,15 @@ EOF
   cat >"$AEGIS_HOME/.env" <<EOF
 AEGIS_AUTH_SECRET=$(quote_env "$AEGIS_AUTH_SECRET")
 AEGIS_BOOTSTRAP_TENANT=$(quote_env "$AEGIS_BOOTSTRAP_TENANT")
+AEGIS_PROFILE=$(quote_env "$AEGIS_PROFILE")
 AEGIS_API_URL="http://localhost:8787"
 AEGIS_PUBLIC_URL=$(quote_env "${AEGIS_PUBLIC_URL:-http://localhost:8788}")
 AEGIS_WEB_PORT=$(quote_env "${AEGIS_WEB_PORT:-8788}")
-AEGIS_SQLITE_PATH=$(quote_env "$STATE_DIR/aegis.sqlite")
+AEGIS_RUNTIME_DIR=$(quote_env "$STATE_DIR")
+AEGIS_RUN_DIR=$(quote_env "$RUN_DIR")
+AEGIS_LOG_DIR=$(quote_env "$LOG_DIR")
+AEGIS_EVIDENCE_DIR=$(quote_env "$EVIDENCE_DIR")
+AEGIS_SQLITE_PATH=$(quote_env "$DB_DIR/aegis.sqlite")
 AEGIS_ATTACHMENTS_DIR=$(quote_env "$STATE_DIR/attachments")
 
 AEGIS_LLM_BASE_URL=$(quote_env "${AEGIS_LLM_BASE_URL:-}")
@@ -161,8 +177,9 @@ main() {
   need python3
   download_bundle
   write_env
-  mkdir -p "$(dirname "$ROOT_FILE")"
+  mkdir -p "$(dirname "$ROOT_FILE")" "$(dirname "$PROFILE_ROOT_FILE")"
   printf '%s\n' "$AEGIS_HOME" >"$ROOT_FILE"
+  printf '%s\n' "$AEGIS_HOME" >"$PROFILE_ROOT_FILE"
   export PATH="$BIN_DIR:$PATH"
 
   if [ "$WORKER_ONLY" = true ]; then
@@ -178,4 +195,4 @@ main() {
   echo "CLI: $BIN_DIR/aegis"
 }
 
-main
+main "$@"

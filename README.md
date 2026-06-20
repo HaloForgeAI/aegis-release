@@ -46,9 +46,9 @@ curl -fsSL https://raw.githubusercontent.com/HaloForgeAI/aegis-release/main/inst
 Check the install:
 
 ```bash
-~/.aegis/bin/aegis --root ~/.aegis/self-host status
-~/.aegis/bin/aegis --root ~/.aegis/self-host onboarding doctor
-~/.aegis/bin/aegis --root ~/.aegis/self-host worker tools --no-exec
+~/.aegis/bin/aegis --root ~/.aegis/profiles/release status
+~/.aegis/bin/aegis --root ~/.aegis/profiles/release onboarding doctor
+~/.aegis/bin/aegis --root ~/.aegis/profiles/release worker tools --no-exec
 ```
 
 ## Windows Full Self-Host
@@ -68,9 +68,9 @@ powershell -ExecutionPolicy Bypass -File .\install-aegis.ps1
 Check the install:
 
 ```powershell
-& "$HOME\.aegis\bin\aegis.exe" --root "$HOME\.aegis\self-host" status
-& "$HOME\.aegis\bin\aegis.exe" --root "$HOME\.aegis\self-host" onboarding doctor
-& "$HOME\.aegis\bin\aegis.exe" --root "$HOME\.aegis\self-host" worker tools --no-exec
+& "$HOME\.aegis\bin\aegis.exe" --root "$HOME\.aegis\profiles\release" status
+& "$HOME\.aegis\bin\aegis.exe" --root "$HOME\.aegis\profiles\release" onboarding doctor
+& "$HOME\.aegis\bin\aegis.exe" --root "$HOME\.aegis\profiles\release" worker tools --no-exec
 ```
 
 ## Worker-Only: Connect This Machine
@@ -98,17 +98,17 @@ powershell -ExecutionPolicy Bypass -File .\install-aegis.ps1 -WorkerOnly
 After that, start the Local Gateway for the workspace you want Aegis to operate:
 
 ```bash
-aegis --root ~/.aegis/self-host local-gateway --workspace-root ~/work --max-workers 2
+aegis --root ~/.aegis/profiles/release local-gateway --workspace-root ~/work --max-workers 2
 ```
 
 ## Configure Optional Channels
 
-For a self-host install, edit `~/.aegis/self-host/.env` and restart native services.
+For a self-host install, edit `~/.aegis/profiles/release/.env` and restart native services.
 
 ```bash
-cd ~/.aegis/self-host
+cd ~/.aegis/profiles/release
 $EDITOR .env
-aegis --root ~/.aegis/self-host up
+aegis --root ~/.aegis/profiles/release up
 ```
 
 Common optional keys:
@@ -128,23 +128,23 @@ AEGIS_TELEGRAM_MODE=polling
 macOS / Linux:
 
 ```bash
-~/.aegis/self-host/scripts/aegis-stop.sh
-~/.aegis/self-host/scripts/aegis-stop.sh --purge
+~/.aegis/profiles/release/scripts/aegis-stop.sh
+~/.aegis/profiles/release/scripts/aegis-stop.sh --purge
 ```
 
 Windows:
 
 ```powershell
-& "$HOME\.aegis\self-host\scripts\aegis-stop.ps1"
-& "$HOME\.aegis\self-host\scripts\aegis-stop.ps1" -Purge
+& "$HOME\.aegis\profiles\release\scripts\aegis-stop.ps1"
+& "$HOME\.aegis\profiles\release\scripts\aegis-stop.ps1" -Purge
 ```
 
 CLI lifecycle commands:
 
 ```bash
-aegis --root ~/.aegis/self-host stop
-aegis --root ~/.aegis/self-host down
-aegis --root ~/.aegis/self-host down --purge
+aegis --root ~/.aegis/profiles/release stop
+aegis --root ~/.aegis/profiles/release down
+aegis --root ~/.aegis/profiles/release down --purge
 ```
 
 ## Repository Roles
