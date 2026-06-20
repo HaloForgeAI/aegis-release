@@ -28,8 +28,8 @@ jobs:
         run: |
           $null = [scriptblock]::Create((Get-Content -Raw install.ps1))
           $null = [scriptblock]::Create((Get-Content -Raw scripts/aegis-stop.ps1))
-      - name: Public compose shape
+      - name: Public native release shape
         run: |
-          grep -q 'ghcr.io/haloforgeai/aegis' compose/aegis.compose.yml
-          grep -q 'AEGIS_AUTH_SECRET' compose/aegis.compose.yml
+          grep -q 'Aegis Core' README.md
+          grep -q 'native' README.md
           grep -q 'HaloForgeAI/Aegis' README.md
