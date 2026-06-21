@@ -20,16 +20,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Bash syntax
         run: |
-          bash -n install.sh
           bash -n scripts/check-public-release.sh
-          bash -n scripts/aegis-stop.sh
-      - name: PowerShell syntax
-        shell: pwsh
+      - name: Public release copy shape
         run: |
-          $null = [scriptblock]::Create((Get-Content -Raw install.ps1))
-          $null = [scriptblock]::Create((Get-Content -Raw scripts/aegis-stop.ps1))
-      - name: Public native release shape
-        run: |
-          grep -q 'Aegis Core' README.md
-          grep -q 'native' README.md
+          grep -q 'macos-arm64.dmg' README.md
+          grep -q 'windows-x64.msix' README.md
+          grep -q 'android.apk' README.md
+          grep -q 'android.aab' README.md
+          grep -q 'ios.ipa' README.md
           grep -q 'HaloForgeAI/Aegis' README.md
+          grep -q 'Tailscale Serve' README.md
+          grep -q 'Cloudflare Tunnel' README.md
