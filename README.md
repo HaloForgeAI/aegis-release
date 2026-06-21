@@ -54,7 +54,11 @@ Do not expose an unauthenticated Aegis Core.
 
 Do not hand-edit generated release assets here. DMG, Windows ZIP/MSIX, APK, AAB,
 IPA, and `SHA256SUMS` should be produced from the private Aegis source tree,
-then uploaded into GitHub Releases in this repository.
+then uploaded into GitHub Releases in this repository. Apple assets are normally
+built on the owner's Mac with `scripts/build-local-macos-release.sh` and
+`scripts/build-local-ios-release.sh`, then uploaded with
+`scripts/upload-local-release-assets.sh` to avoid unnecessary GitHub-hosted
+macOS runner usage.
 
 ## Public Release Check
 
