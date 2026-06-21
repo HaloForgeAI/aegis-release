@@ -22,6 +22,21 @@ check_url() {
   fi
 }
 
+check_absent_url() {
+  local label="$1"
+  local url="$2"
+  local code
+  code="$(curl -LsS -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
+  if [[ "$code" == "404" ]]; then
+    printf 'ok   absent %s\n' "$label"
+  elif [[ "$code" == "200" || "$code" == "302" ]]; then
+    printf 'fail legacy asset is still public: %s\n' "$label"
+    status=1
+  else
+    printf 'warn %s absence check HTTP %s\n' "$label" "$code"
+  fi
+}
+
 check_domain() {
   local code
   code="$(curl -LsS -o /dev/null -w '%{http_code}' --max-time 20 "$DOMAIN" 2>/dev/null || true)"
@@ -43,6 +58,10 @@ if [[ "$EXPECT_IOS" == "1" ]]; then
 else
   printf 'skip iOS signed IPA (set AEGIS_EXPECT_IOS_IPA=1 when Apple export signing is configured)\n'
 fi
+check_absent_url "legacy Bash installer" "${RELEASE_URL}/install.sh"
+check_absent_url "legacy PowerShell installer" "${RELEASE_URL}/install.ps1"
+check_absent_url "Windows portable ZIP diagnostic" "${RELEASE_URL}/Aegis-${VERSION}-windows-x64.zip"
+check_absent_url "Docker archive" "${RELEASE_URL}/Aegis-${VERSION}-docker.tar.gz"
 check_domain
 
 exit "$status"

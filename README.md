@@ -68,7 +68,9 @@ Maintainers can check the public gates with:
 scripts/check-public-release.sh v0.1.5
 ```
 
-The check verifies native app downloads, checksums, and the public brand site.
-It expects a signed Windows MSIX, signed Android APK/AAB, and signed iOS IPA by default. Set
-`AEGIS_EXPECT_IOS_IPA=0` only when the iOS path is TestFlight-only for that
-specific release.
+The check verifies native app downloads, checksums, the public brand site, and
+that legacy install assets such as `install.sh`, `install.ps1`, Windows ZIP
+diagnostics, and Docker archives are not attached to the public release. It
+expects a signed Windows MSIX, signed Android APK/AAB, and signed iOS IPA by
+default. Set `AEGIS_EXPECT_IOS_IPA=0` only when the iOS path is TestFlight-only
+for that specific release.
