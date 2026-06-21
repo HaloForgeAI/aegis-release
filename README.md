@@ -3,8 +3,9 @@
 Public native application assets for Aegis, the HaloForgeAI personal AI
 assistant hub.
 
-This repository is the user-facing distribution layer. The private source repo
-builds native apps and mirrors public release assets here.
+This repository is the user-facing distribution layer. Native apps are built
+from the private source repo, either by the release workflow or by an
+owner-controlled local build/upload script, and mirrored here as public assets.
 
 ## Install Aegis
 
@@ -52,8 +53,8 @@ Do not expose an unauthenticated Aegis Core.
 | `HaloForgeAI/aegis-agent-plugins` | Public | Codex, Claude Code, and agent plugin distribution |
 
 Do not hand-edit generated release assets here. DMG, Windows ZIP/MSIX, APK, AAB,
-IPA, and `SHA256SUMS` should be produced by the private Aegis
-release workflow, then mirrored into GitHub Releases in this repository.
+IPA, and `SHA256SUMS` should be produced from the private Aegis source tree,
+then uploaded into GitHub Releases in this repository.
 
 ## Public Release Check
 
