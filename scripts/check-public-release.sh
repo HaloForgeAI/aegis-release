@@ -35,7 +35,7 @@ check_domain() {
 
 check_url "SHA256SUMS" "${RELEASE_URL}/SHA256SUMS"
 check_url "macOS Apple Silicon DMG" "${RELEASE_URL}/Aegis-${VERSION}-macos-arm64.dmg"
-check_url "Windows x64 MSIX" "${RELEASE_URL}/Aegis-${VERSION}-windows-x64.msix"
+check_url "Windows x64 ZIP package" "${RELEASE_URL}/Aegis-${VERSION}-windows-x64.zip"
 check_url "Android release AAB" "${RELEASE_URL}/Aegis-${VERSION}-android.aab"
 check_url "Android signed APK" "${RELEASE_URL}/Aegis-${VERSION}-android.apk"
 if [[ "$EXPECT_IOS" == "1" ]]; then

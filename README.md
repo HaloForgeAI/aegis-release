@@ -15,7 +15,7 @@ and choose the app for your platform.
 | Platform | Primary asset | Notes |
 | --- | --- | --- |
 | macOS Apple Silicon | `Aegis-<version>-macos-arm64.dmg` | Drag `Aegis.app` into Applications. |
-| Windows x64 | `Aegis-<version>-windows-x64.msix` | Use the MSIX package when signed. Portable zip is for trusted testing only. |
+| Windows x64 | `Aegis-<version>-windows-x64.zip` | Current verified Windows app package. MSIX/MSI should appear here only after release CI emits signed installer assets. |
 | iPhone / iPad | TestFlight or signed `Aegis-<version>-ios.ipa` | IPA export requires Apple signing/provisioning. |
 | Android | signed `Aegis-<version>-android.apk` or `Aegis-<version>-android.aab` | APK is for direct install; AAB is for Play-style distribution. |
 
@@ -51,8 +51,8 @@ Do not expose an unauthenticated Aegis Core.
 | `HaloForgeAI/aegis-docs` | Public | Formal user manual |
 | `HaloForgeAI/aegis-agent-plugins` | Public | Codex, Claude Code, and agent plugin distribution |
 
-Do not hand-edit generated release assets here. DMG, MSIX, APK, AAB, IPA,
-portable fallbacks, and `SHA256SUMS` should be produced by the private Aegis
+Do not hand-edit generated release assets here. DMG, Windows ZIP/MSIX, APK, AAB,
+IPA, and `SHA256SUMS` should be produced by the private Aegis
 release workflow, then mirrored into GitHub Releases in this repository.
 
 ## Public Release Check
