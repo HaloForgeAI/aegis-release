@@ -12,7 +12,7 @@ access to the private source repository.
 
 ## Do Not Edit Here
 
-- Rust, TypeScript, Dockerfile, database, gateway, worker, channel, MCP, and UI
+- Runtime source, database, gateway, worker, channel, MCP, native app, and UI
   implementation logic. Change those in `HaloForgeAI/Aegis`.
 - Generated native app assets. They are built by the `HaloForgeAI/Aegis`
   release workflow.
