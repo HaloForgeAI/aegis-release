@@ -22,7 +22,9 @@ and choose the app for your platform.
 
 Verify `SHA256SUMS` before installing when it is attached to the release.
 Public release checks expect signed platform assets. Unsigned build artifacts
-belong in workflow runs, not user-facing GitHub Releases.
+belong in workflow runs, not user-facing GitHub Releases. The checksum manifest
+must list the signed native app assets and must not list legacy installers,
+Docker archives, portable ZIP diagnostics, or unsigned diagnostic builds.
 
 ## Advanced Operator Tools
 
@@ -68,9 +70,10 @@ Maintainers can check the public gates with:
 scripts/check-public-release.sh v0.1.5
 ```
 
-The check verifies native app downloads, checksums, the public brand site, and
-that legacy install assets such as `install.sh`, `install.ps1`, Windows ZIP
-diagnostics, and Docker archives are not attached to the public release. It
-expects a signed Windows MSIX, signed Android APK/AAB, and signed iOS IPA by
-default. Set `AEGIS_EXPECT_IOS_IPA=0` only when the iOS path is TestFlight-only
-for that specific release.
+The check verifies native app downloads, checksum manifest entries, the public
+brand site, and that legacy install assets such as `install.sh`, `install.ps1`,
+Windows ZIP diagnostics, Docker archives, and unsigned diagnostic builds are not
+attached to the public release or listed in `SHA256SUMS`. It expects a signed
+Windows MSIX, signed Android APK/AAB, and signed iOS IPA by default. Set
+`AEGIS_EXPECT_IOS_IPA=0` only when the iOS path is TestFlight-only for that
+specific release.
