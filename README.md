@@ -16,7 +16,7 @@ and choose the app for your platform.
 | Platform | Primary asset | Notes |
 | --- | --- | --- |
 | macOS Apple Silicon | `Aegis-<version>-macos-arm64.dmg` | Drag `Aegis.app` into Applications. |
-| Windows x64 | `Aegis-<version>-windows-x64.zip` | Current verified Windows app package. MSIX/MSI should appear here only after release CI emits signed installer assets. |
+| Windows x64 | signed `Aegis-<version>-windows-x64.msix` | Primary Windows installer. `Aegis-<version>-windows-x64.zip` is a trusted testing / portable fallback only. |
 | iPhone / iPad | TestFlight or signed `Aegis-<version>-ios.ipa` | IPA export requires Apple signing/provisioning. |
 | Android | signed `Aegis-<version>-android.apk` or `Aegis-<version>-android.aab` | APK is for direct install; AAB is for Play-style distribution. |
 
@@ -52,7 +52,7 @@ Do not expose an unauthenticated Aegis Core.
 | `HaloForgeAI/aegis-docs` | Public | Formal user manual |
 | `HaloForgeAI/aegis-agent-plugins` | Public | Codex, Claude Code, and agent plugin distribution |
 
-Do not hand-edit generated release assets here. DMG, Windows ZIP/MSIX, APK, AAB,
+Do not hand-edit generated release assets here. DMG, Windows MSIX/portable ZIP, APK, AAB,
 IPA, and `SHA256SUMS` should be produced from the private Aegis source tree,
 then uploaded into GitHub Releases in this repository. Apple assets are normally
 built on the owner's Mac with `scripts/build-local-macos-release.sh` and
@@ -69,6 +69,6 @@ scripts/check-public-release.sh v0.1.5
 ```
 
 The check verifies native app downloads, checksums, and the public brand site.
-It expects a signed Android APK/AAB and signed iOS IPA by default. Set
+It expects a signed Windows MSIX, signed Android APK/AAB, and signed iOS IPA by default. Set
 `AEGIS_EXPECT_IOS_IPA=0` only when the iOS path is TestFlight-only for that
 specific release.
