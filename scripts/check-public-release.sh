@@ -6,7 +6,6 @@ REPO="${AEGIS_RELEASE_REPO:-HaloForgeAI/aegis-release}"
 DOMAIN="${AEGIS_SITE_DOMAIN:-https://aegis.haloforge.dev}"
 RELEASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
 EXPECT_IOS="${AEGIS_EXPECT_IOS_IPA:-1}"
-EXPECT_WINDOWS_ZIP="${AEGIS_EXPECT_WINDOWS_ZIP:-0}"
 
 status=0
 
@@ -37,11 +36,6 @@ check_domain() {
 check_url "SHA256SUMS" "${RELEASE_URL}/SHA256SUMS"
 check_url "macOS Apple Silicon DMG" "${RELEASE_URL}/Aegis-${VERSION}-macos-arm64.dmg"
 check_url "Windows x64 signed MSIX" "${RELEASE_URL}/Aegis-${VERSION}-windows-x64.msix"
-if [[ "$EXPECT_WINDOWS_ZIP" == "1" ]]; then
-  check_url "Windows x64 portable ZIP fallback" "${RELEASE_URL}/Aegis-${VERSION}-windows-x64.zip"
-else
-  printf 'skip Windows portable ZIP fallback (set AEGIS_EXPECT_WINDOWS_ZIP=1 when this release attaches it)\n'
-fi
 check_url "Android release AAB" "${RELEASE_URL}/Aegis-${VERSION}-android.aab"
 check_url "Android signed APK" "${RELEASE_URL}/Aegis-${VERSION}-android.apk"
 if [[ "$EXPECT_IOS" == "1" ]]; then
