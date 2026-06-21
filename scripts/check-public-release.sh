@@ -94,6 +94,7 @@ check_absent_sha256_entry() {
 }
 
 fetch_sha256sums
+check_url "macOS Apple Silicon PKG" "${RELEASE_URL}/Aegis-${VERSION}-macos-arm64.pkg"
 check_url "macOS Apple Silicon DMG" "${RELEASE_URL}/Aegis-${VERSION}-macos-arm64.dmg"
 check_url "Windows x64 signed MSIX" "${RELEASE_URL}/Aegis-${VERSION}-windows-x64.msix"
 check_url "Android release AAB" "${RELEASE_URL}/Aegis-${VERSION}-android.aab"
@@ -113,6 +114,7 @@ check_absent_url "unsigned Android APK diagnostic" "${RELEASE_URL}/Aegis-${VERSI
 check_absent_url "unsigned Android AAB diagnostic" "${RELEASE_URL}/Aegis-${VERSION}-android-unsigned.aab"
 check_domain
 
+check_sha256_entry "macOS Apple Silicon PKG" "Aegis-${VERSION}-macos-arm64.pkg"
 check_sha256_entry "macOS Apple Silicon DMG" "Aegis-${VERSION}-macos-arm64.dmg"
 check_sha256_entry "Windows x64 signed MSIX" "Aegis-${VERSION}-windows-x64.msix"
 check_sha256_entry "Android release AAB" "Aegis-${VERSION}-android.aab"
