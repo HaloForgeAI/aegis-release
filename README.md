@@ -20,6 +20,8 @@ and choose the app for your platform.
 | Android | signed `Aegis-<version>-android.apk` or `Aegis-<version>-android.aab` | APK is for direct install; AAB is for Play-style distribution. |
 
 Verify `SHA256SUMS` before installing when it is attached to the release.
+Public release checks expect signed platform assets. Unsigned build artifacts
+belong in workflow runs, not user-facing GitHub Releases.
 
 ## Advanced Operator Tools
 
@@ -62,3 +64,6 @@ scripts/check-public-release.sh v0.1.5
 ```
 
 The check verifies native app downloads, checksums, and the public brand site.
+It expects a signed Android APK/AAB and signed iOS IPA by default. Set
+`AEGIS_EXPECT_IOS_IPA=0` only when the iOS path is TestFlight-only for that
+specific release.

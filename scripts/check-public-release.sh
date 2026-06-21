@@ -5,8 +5,7 @@ VERSION="${1:-${AEGIS_VERSION:-v0.1.5}}"
 REPO="${AEGIS_RELEASE_REPO:-HaloForgeAI/aegis-release}"
 DOMAIN="${AEGIS_SITE_DOMAIN:-https://aegis.haloforge.dev}"
 RELEASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
-EXPECT_IOS="${AEGIS_EXPECT_IOS_IPA:-0}"
-EXPECT_UNSIGNED_ANDROID="${AEGIS_EXPECT_UNSIGNED_ANDROID:-0}"
+EXPECT_IOS="${AEGIS_EXPECT_IOS_IPA:-1}"
 
 status=0
 
@@ -38,11 +37,7 @@ check_url "SHA256SUMS" "${RELEASE_URL}/SHA256SUMS"
 check_url "macOS Apple Silicon DMG" "${RELEASE_URL}/Aegis-${VERSION}-macos-arm64.dmg"
 check_url "Windows x64 MSIX" "${RELEASE_URL}/Aegis-${VERSION}-windows-x64.msix"
 check_url "Android release AAB" "${RELEASE_URL}/Aegis-${VERSION}-android.aab"
-if [[ "$EXPECT_UNSIGNED_ANDROID" == "1" ]]; then
-  check_url "Android unsigned APK build artifact" "${RELEASE_URL}/Aegis-${VERSION}-android-unsigned.apk"
-else
-  check_url "Android signed APK" "${RELEASE_URL}/Aegis-${VERSION}-android.apk"
-fi
+check_url "Android signed APK" "${RELEASE_URL}/Aegis-${VERSION}-android.apk"
 if [[ "$EXPECT_IOS" == "1" ]]; then
   check_url "iOS signed IPA" "${RELEASE_URL}/Aegis-${VERSION}-ios.ipa"
 else
